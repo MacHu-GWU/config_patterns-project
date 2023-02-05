@@ -11,7 +11,7 @@ from pathlib import Path
 try:
     import boto3
     import boto_session_manager
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     pass
 
 #
@@ -21,7 +21,7 @@ try:
 
     from ..aws.ssm import deploy_parameter
     from ..aws.s3 import deploy_config
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     pass
 
 
@@ -55,6 +55,7 @@ class BaseEnvEnum(str, enum.Enum):
     Valid examples are: dev, test, prod, stage1, stage2,
     Invalid examples are: my_dev, 1dev
     """
+
     @classmethod
     def ensure_str(cls, value: T.Union[str, "BaseEnvEnum"]) -> str:
         if isinstance(value, cls):
@@ -212,7 +213,7 @@ class BaseConfig:
     def project_name_snake(self) -> str:
         return slugify(self.project_name, delim="_")
 
-    def get_env(self, env_name: T.Union[str, BaseEnvEnum]) -> BaseEnv:
+    def get_env(self, env_name: T.Union[str, BaseEnvEnum]):
         env_name = BaseEnvEnum.ensure_str(env_name)
         data = dict()
         data.update(copy.deepcopy(self.data["shared"]))
@@ -276,7 +277,9 @@ class BaseConfig:
                 Env=env_class,
                 EnvEnum=env_enum_class,
             )
-        elif (parameter_name is not None) and (parameter_with_encryption is not None):
+        elif (parameter_name is not None) and (
+            parameter_with_encryption is not None
+        ):  # pragma: no cover
             aws_secret = pysecret.AWSSecret(boto_session=boto3.session.Session())
             parameter_data = aws_secret.get_parameter_data(
                 name=parameter_name,
@@ -288,7 +291,7 @@ class BaseConfig:
                 Env=env_class,
                 EnvEnum=env_enum_class,
             )
-        elif s3path_config is not None:
+        elif s3path_config is not None:  # pragma: no cover
             s3_client = boto3.client("s3")
             parts = s3path_config.split("/", 3)
             bucket = parts[2]
@@ -311,11 +314,13 @@ class BaseConfig:
                 "you want to read config from local config json file.\n"
                 "2. set both ``parameter_name`` and ``parameter_with_encryption`` "
                 "to indicate that you want to read from AWS Parameter Store.\n"
-                "3. set ``s3path_config`` similar to s3://my-bucket/my-project/dev.json " \
+                "3. set ``s3path_config`` similar to s3://my-bucket/my-project/dev.json "
                 "to indicate that you want to read from AWS S3.\n"
             )
 
-    def _prepare_deploy(self) -> T.List[T.Tuple[str, dict, str, str]]:
+    def _prepare_deploy(
+        self,
+    ) -> T.List[T.Tuple[str, dict, str, str]]:  # pragma: no cover
         """
         split the consolidated config into per environment config.
 
@@ -325,7 +330,9 @@ class BaseConfig:
         parameter_list: T.List[T.Tuple[str, dict, str, str]] = list()
         parameter_name = self.project_name_slug
         parameter_data = {"data": self.data, "secret_data": self.secret_data}
-        parameter_list.append((parameter_name, parameter_data, self.project_name, "all"))
+        parameter_list.append(
+            (parameter_name, parameter_data, self.project_name, "all")
+        )
 
         for env_name in self.EnvEnum:
             env_name = self.EnvEnum.ensure_str(env_name)
@@ -341,7 +348,9 @@ class BaseConfig:
                     "envs": {env.env_name: self.secret_data["envs"][env.env_name]},
                 },
             }
-            parameter_list.append((parameter_name, parameter_data, env.project_name, env.env_name))
+            parameter_list.append(
+                (parameter_name, parameter_data, env.project_name, env.env_name)
+            )
 
         return parameter_list
 
@@ -350,7 +359,7 @@ class BaseConfig:
         bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
         parameter_with_encryption: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
-    ):
+    ):  # pragma: no cover
         """
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
@@ -369,11 +378,19 @@ class BaseConfig:
         """
         if (bsm is not None) and (parameter_with_encryption is not None):
             # validate arguments
-            if not ((parameter_with_encryption is True) or (parameter_with_encryption is False)):
+            if not (
+                (parameter_with_encryption is True)
+                or (parameter_with_encryption is False)
+            ):
                 raise ValueError
             print("deploy parameter store for all environment")
             parameter_list = self._prepare_deploy()
-            for parameter_name, parameter_data, project_name, env_name in parameter_list:
+            for (
+                parameter_name,
+                parameter_data,
+                project_name,
+                env_name,
+            ) in parameter_list:
                 deploy_parameter(
                     bsm=bsm,
                     parameter_name=parameter_name,
@@ -382,7 +399,7 @@ class BaseConfig:
                     tags=dict(
                         ProjectName=project_name,
                         EnvName=env_name,
-                    )
+                    ),
                 )
         elif (bsm is not None) and (s3dir_config is not None):
             if not s3dir_config.endswith("/"):
@@ -398,7 +415,7 @@ class BaseConfig:
                 tags=dict(
                     ProjectName=parameter_list[0][2],
                     EnvName=parameter_list[0][3],
-                )
+                ),
             )
 
             for _, parameter_data, project_name, env_name in parameter_list[1:]:

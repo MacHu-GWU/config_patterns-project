@@ -2,12 +2,12 @@
 # for more info: https://coverage.readthedocs.io/en/latest/config.html
 [run]
 omit =
-    config_patterns/_version.py
-    config_patterns/cli.py
-    config_patterns/pkg/*
     config_patterns/docs/*
+    config_patterns/vendor/*
     config_patterns/tests/*
-    config_patterns/handlers/*
+    config_patterns/aws/*
+    config_patterns/_version.py
+    config_patterns/paths.py
 
 [report]
 # Regexes for lines to exclude from consideration

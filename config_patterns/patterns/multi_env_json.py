@@ -212,7 +212,7 @@ class BaseConfig:
     def project_name_snake(self) -> str:
         return slugify(self.project_name, delim="_")
 
-    def get_env(self, env_name: str) -> BaseEnv:
+    def get_env(self, env_name: T.Union[str, BaseEnvEnum]) -> BaseEnv:
         env_name = BaseEnvEnum.ensure_str(env_name)
         data = dict()
         data.update(copy.deepcopy(self.data["shared"]))

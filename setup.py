@@ -155,14 +155,24 @@ if __name__ == "__main__":
     EXTRA_REQUIRE = dict()
 
     try:
-        EXTRA_REQUIRE["tests"] = read_requirements_file("requirements-test.txt")
+        EXTRA_REQUIRE["dev"] = read_requirements_file("requirements-dev.txt")
+    except:
+        print("'requirements-dev.txt' not found!")
+
+    try:
+        EXTRA_REQUIRE["test"] = read_requirements_file("requirements-test.txt")
     except:
         print("'requirements-test.txt' not found!")
 
     try:
-        EXTRA_REQUIRE["docs"] = read_requirements_file("requirements-doc.txt")
+        EXTRA_REQUIRE["doc"] = read_requirements_file("requirements-doc.txt")
     except:
         print("'requirements-doc.txt' not found!")
+
+    try:
+        EXTRA_REQUIRE["aws"] = read_requirements_file("requirements-aws.txt")
+    except:
+        print("'requirements-aws.txt' not found!")
 
     setup(
         name=PKG_NAME,

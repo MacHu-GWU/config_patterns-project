@@ -64,6 +64,24 @@ class BaseEnvEnum(str, enum.Enum):
             return value
 
 
+def normalize_parameter_name(param_name: str) -> str:
+    """
+    AWS has limitation that the name cannot be prefixed with "aws" or "ssm",
+    so this method will automatically add prepend character to the name.
+
+    Ref:
+
+    - AWS Parameter Name Limitation: https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html#options
+    """
+    if (
+        param_name.startswith("aws")
+        or param_name.startswith("ssm")
+    ):
+        return f"p-{param_name}"
+    else:
+        return param_name
+
+
 @dataclasses.dataclass
 class BaseEnv:
     """
@@ -137,24 +155,12 @@ class BaseEnv:
     @cached_property
     def parameter_name(self) -> str:
         """
-        Return the aws SSM parameter name for this project. Usually, it is
-        the name as the "${project_name}-${env_name}"". AWS has limitation that
-        the name cannot be prefixed with "aws" or "ssm", so this method will
-        automatically add prepend character to the name
+        Return the per-environment AWS SSM Parameter name.
+        Usually, the naming convention is "${project_name}-${env_name}"".
 
         Example: "my_project-dev"
-
-        Ref:
-
-        - AWS Parameter Name Limitation: https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html#options
         """
-        if (
-            self.prefix_name_snake.startswith("aws")
-            or self.prefix_name_snake.startswith("ssm")
-        ):
-            return f"p-{self.prefix_name_snake}"
-        else:
-            return self.prefix_name_snake
+        return normalize_parameter_name(self.prefix_name_snake)
 
 
 @dataclasses.dataclass
@@ -230,6 +236,16 @@ class BaseConfig:
     @cached_property
     def project_name_snake(self) -> str:
         return slugify(self.project_name, delim="_")
+
+    @cached_property
+    def parameter_name(self) -> str:
+        """
+        Return the all-environment AWS SSM Parameter name.
+        Usually, the naming convention is "${project_name}".
+
+        Example: "my_project-dev"
+        """
+        return normalize_parameter_name(self.project_name_snake)
 
     # don't put type hint for return value, it should return a
     # user defined subclass, which is impossible to predict.
@@ -359,7 +375,7 @@ class BaseConfig:
 
         # manually add all env parameter, the name is project_name only
         # without env_name
-        parameter_name = self.project_name_snake
+        parameter_name = self.parameter_name
         parameter_data = {"data": self.data, "secret_data": self.secret_data}
         parameter_list.append(
             (parameter_name, parameter_data, self.project_name, "all")

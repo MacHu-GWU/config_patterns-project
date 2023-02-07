@@ -12,9 +12,9 @@ from config_patterns.patterns.multi_env_json import (
 
 
 class EnvEnum(BaseEnvEnum):
-    dev = "dev" # development
-    int = "int" # integration test
-    prod = "prod" # production
+    dev = "dev"  # development
+    int = "int"  # integration test
+    prod = "prod"  # production
 
 
 @dataclasses.dataclass
@@ -36,3 +36,7 @@ class Config(BaseConfig):
     @property
     def prod(self) -> Env:
         return self.get_env(EnvEnum.prod)
+
+    @classmethod
+    def get_current_env(cls) -> str:
+        return EnvEnum.dev.value

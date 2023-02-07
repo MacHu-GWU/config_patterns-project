@@ -19,8 +19,8 @@ try:
     import pysecret
     import aws_console_url
 
-    from ..aws.ssm import deploy_parameter
-    from ..aws.s3 import deploy_config
+    from ..aws.ssm import deploy_parameter, delete_parameter
+    from ..aws.s3 import deploy_config, delete_config
 except ImportError:  # pragma: no cover
     pass
 
@@ -136,7 +136,25 @@ class BaseEnv:
 
     @cached_property
     def parameter_name(self) -> str:
-        return self.prefix_name_snake
+        """
+        Return the aws SSM parameter name for this project. Usually, it is
+        the name as the "${project_name}-${env_name}"". AWS has limitation that
+        the name cannot be prefixed with "aws" or "ssm", so this method will
+        automatically add prepend character to the name
+
+        Example: "my_project-dev"
+
+        Ref:
+
+        - AWS Parameter Name Limitation: https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html#options
+        """
+        if (
+            self.prefix_name_snake.startswith("aws")
+            or self.prefix_name_snake.startswith("ssm")
+        ):
+            return f"p-{self.prefix_name_snake}"
+        else:
+            return self.prefix_name_snake
 
 
 @dataclasses.dataclass
@@ -213,6 +231,8 @@ class BaseConfig:
     def project_name_snake(self) -> str:
         return slugify(self.project_name, delim="_")
 
+    # don't put type hint for return value, it should return a
+    # user defined subclass, which is impossible to predict.
     def get_env(self, env_name: T.Union[str, BaseEnvEnum]):
         env_name = BaseEnvEnum.ensure_str(env_name)
         data = dict()
@@ -225,6 +245,12 @@ class BaseConfig:
 
     @classmethod
     def get_current_env(cls) -> str:
+        """
+        An abstract method that can figure out what is the environment this config
+        should deal with. For example, you can define the git feature branch
+        will become the dev env; the master branch will become the int env;
+        the release branch will become prod env;
+        """
         raise NotImplementedError(
             "You have to implement this method to detect what environment "
             "you should use. It should be a class method that take no argument "
@@ -233,8 +259,10 @@ class BaseConfig:
             "Also you can use subprocess to call git CLI to check your current branch."
         )
 
+    # don't put type hint for return value, it should return a
+    # user defined subclass, which is impossible to predict.
     @cached_property
-    def env(self) -> BaseEnv:
+    def env(self):
         """
         Access the current :class:`Env` object.
         """
@@ -328,12 +356,16 @@ class BaseConfig:
             2. parameter_data, 3. project_name, 4. env_name.
         """
         parameter_list: T.List[T.Tuple[str, dict, str, str]] = list()
-        parameter_name = self.project_name_slug
+
+        # manually add all env parameter, the name is project_name only
+        # without env_name
+        parameter_name = self.project_name_snake
         parameter_data = {"data": self.data, "secret_data": self.secret_data}
         parameter_list.append(
             (parameter_name, parameter_data, self.project_name, "all")
         )
 
+        # add per env parameter
         for env_name in self.EnvEnum:
             env_name = self.EnvEnum.ensure_str(env_name)
             env = self.get_env(env_name)
@@ -373,8 +405,7 @@ class BaseConfig:
 
         Note:
 
-            this function should ONLY run from the project admin's trusted
-            laptop.
+            this function should ONLY run from the project admin's trusted laptop.
         """
         if (bsm is not None) and (parameter_with_encryption is not None):
             # validate arguments
@@ -435,4 +466,60 @@ class BaseConfig:
                 "you want to deploy to AWS Parameter Store.\n"
                 "2. set ``s3dir_config`` similar to s3://my-bucket/my-project/ "
                 "to indicate that you want to deploy to S3."
+            )
+
+    def delete(
+        self,
+        bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
+        use_parameter_store: T.Optional[bool] = None,
+        s3dir_config: T.Optional[str] = None,
+    ):
+        """
+        Delete the all project config of all environments from configuration store.
+
+        Currently, it supports:
+
+        1. delete from AWS Parameter Store
+        2. delete from AWS S3
+
+        :param bsm:
+        :param use_parameter_store:
+        :param s3dir_config:
+
+        Note:
+
+            this function should ONLY run from the project admin's trusted laptop.
+        """
+        if (bsm is not None) and (use_parameter_store is True):
+            print("delete parameter store for all environment")
+            parameter_list = self._prepare_deploy()
+            for parameter_name, _, _, _ in parameter_list:
+                delete_parameter(
+                    bsm=bsm,
+                    parameter_name=parameter_name,
+                )
+        elif (bsm is not None) and (s3dir_config is not None):
+            if not s3dir_config.endswith("/"):
+                raise ValueError(
+                    "s3dir_config has to be a folder and end with /, "
+                    "a valid example: s3://my-bucket/my-project/."
+                )
+            parameter_list = self._prepare_deploy()
+            delete_config(
+                bsm=bsm,
+                s3path_config=f"{s3dir_config}all.json",
+            )
+
+            for _, _, _, env_name in parameter_list[1:]:
+                delete_config(
+                    bsm=bsm,
+                    s3path_config=f"{s3dir_config}{env_name}.json",
+                )
+        else:
+            raise ValueError(
+                "The arguments has to meet one of these criteria:\n"
+                "1. set ``use_parameter_store`` to True to indicate that "
+                "you want to delete config from AWS Parameter Store.\n"
+                "2. set ``s3dir_config`` similar to s3://my-bucket/my-project/ "
+                "to indicate that you want to delete config file from S3."
             )

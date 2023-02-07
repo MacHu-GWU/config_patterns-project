@@ -50,3 +50,30 @@ def deploy_config(
         kwargs["Tagging"] = tagging
     bsm.s3_client.put_object(**kwargs)
     print("done!")
+
+
+def delete_config(
+    bsm: "boto_session_manager.BotoSesManager",
+    s3path_config: str,
+):
+    """
+    Delete config from AWS S3
+
+    Ref:
+
+    - https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.delete_object
+    """
+    parts = s3path_config.split("/", 3)
+    bucket = parts[2]
+    key = parts[3]
+
+    aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
+    print(f"🗑️ delete config file {s3path_config} ...")
+    print(f"preview at: {aws_console.s3.get_console_url(bucket, key)}")
+
+    bsm.s3_client.delete_object(
+        Bucket=bucket,
+        Key=key,
+    )
+
+    print("done!")

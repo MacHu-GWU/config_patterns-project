@@ -69,3 +69,29 @@ def deploy_parameter(
         else:
             print("parameter data is the same as existing one, do nothing.")
     print("done!")
+
+
+def delete_parameter(
+    bsm: "boto_session_manager.BotoSesManager",
+    parameter_name: str,
+):
+    """
+    Delete AWS SSM parameter.
+
+    Ref:
+
+    - https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ssm.html#SSM.Client.delete_parameter
+    """
+    aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
+    print(f"🗑️ delete SSM Parameter {parameter_name!r} ...")
+    print(f"verify at: {aws_console.ssm.get_parameter(parameter_name)}")
+
+    try:
+        bsm.ssm_client.delete_parameter(Name=parameter_name)
+    except Exception as e:
+        if "ParameterNotFound" in str(e):
+            print("not exists, do nothing.")
+        else:
+            raise e
+
+    print("done!")

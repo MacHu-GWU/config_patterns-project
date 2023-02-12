@@ -21,6 +21,10 @@ Backlog (TODO)
 
 - now depends on ``pysecret >= 2.2.2``
 
+**Bugfixes**
+
+- fix a bug that the ``bsm`` argument is missing
+
 
 0.2.2 (2023-02-07)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -288,6 +288,7 @@ class BaseConfig:
         env_enum_class: T.Type[BaseEnvEnum],
         path_config: T.Optional[str] = None,
         path_secret_config: T.Optional[str] = None,
+        bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
         parameter_name: T.Optional[str] = None,
         parameter_with_encryption: T.Optional[bool] = None,
         s3path_config: T.Optional[str] = None,
@@ -321,11 +322,12 @@ class BaseConfig:
         elif (parameter_name is not None) and (
             parameter_with_encryption is not None
         ):  # pragma: no cover
-            aws_secret = pysecret.AWSSecret(boto_session=boto3.session.Session())
-            parameter_data = aws_secret.get_parameter_data(
+            parameter = pysecret.Parameter.load(
+                ssm_client=bsm.ssm_client,
                 name=parameter_name,
-                with_encryption=parameter_with_encryption,
+                with_decryption=parameter_with_encryption,
             )
+            parameter_data = parameter.json_dict
             return cls(
                 data=parameter_data["data"],
                 secret_data=parameter_data["secret_data"],
@@ -333,12 +335,11 @@ class BaseConfig:
                 EnvEnum=env_enum_class,
             )
         elif s3path_config is not None:  # pragma: no cover
-            s3_client = boto3.client("s3")
             parts = s3path_config.split("/", 3)
             bucket = parts[2]
             key = parts[3]
             config_data = json_loads(
-                s3_client.get_object(Bucket=bucket, Key=key)["Body"]
+                bsm.s3_client.get_object(Bucket=bucket, Key=key)["Body"]
                 .read()
                 .decode("utf-8")
             )
@@ -401,7 +402,7 @@ class BaseConfig:
 
     def deploy(
         self,
-        bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
+        bsm: "boto_session_manager.BotoSesManager",
         parameter_with_encryption: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
     ):  # pragma: no cover
@@ -420,7 +421,7 @@ class BaseConfig:
 
             this function should ONLY run from the project admin's trusted laptop.
         """
-        if (bsm is not None) and (parameter_with_encryption is not None):
+        if parameter_with_encryption is not None:
             # validate arguments
             if not (
                 (parameter_with_encryption is True)
@@ -445,7 +446,7 @@ class BaseConfig:
                         EnvName=env_name,
                     ),
                 )
-        elif (bsm is not None) and (s3dir_config is not None):
+        elif s3dir_config is not None:
             if not s3dir_config.endswith("/"):
                 raise ValueError(
                     "s3dir_config has to be a folder and end with /, "
@@ -483,7 +484,7 @@ class BaseConfig:
 
     def delete(
         self,
-        bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
+        bsm: "boto_session_manager.BotoSesManager",
         use_parameter_store: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
     ):  # pragma: no cover

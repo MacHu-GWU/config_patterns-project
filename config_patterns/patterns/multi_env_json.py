@@ -73,10 +73,7 @@ def normalize_parameter_name(param_name: str) -> str:
 
     - AWS Parameter Name Limitation: https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html#options
     """
-    if (
-        param_name.startswith("aws")
-        or param_name.startswith("ssm")
-    ):
+    if param_name.startswith("aws") or param_name.startswith("ssm"):
         return f"p-{param_name}"
     else:
         return param_name
@@ -260,7 +257,7 @@ class BaseConfig:
         return self.Env(**data)
 
     @classmethod
-    def get_current_env(cls) -> str:
+    def get_current_env(cls) -> str:  # pragma: no cover
         """
         An abstract method that can figure out what is the environment this config
         should deal with. For example, you can define the git feature branch
@@ -489,7 +486,7 @@ class BaseConfig:
         bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
         use_parameter_store: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
-    ):
+    ):  # pragma: no cover
         """
         Delete the all project config of all environments from configuration store.
 

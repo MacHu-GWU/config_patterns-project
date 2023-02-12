@@ -8,6 +8,7 @@ from pathlib import Path
 from config_patterns.patterns.multi_env_json import (
     validate_project_name,
     validate_env_name,
+    normalize_parameter_name,
     BaseEnvEnum,
     BaseEnv,
     BaseConfig,
@@ -39,6 +40,10 @@ class Config(BaseConfig):
     @property
     def prod(self) -> Env:
         return self.get_env(EnvEnum.prod)
+
+    @classmethod
+    def get_current_env(cls) -> str:
+        return EnvEnum.dev.value
 
 
 class TestBaseEnvEnum:
@@ -91,6 +96,13 @@ def test_validate_env_name():
             validate_env_name(env_name)
 
 
+def test_normalize_parameter_name():
+    assert normalize_parameter_name("aws") == "p-aws"
+    assert normalize_parameter_name("aws-project") == "p-aws-project"
+    assert normalize_parameter_name("ssm") == "p-ssm"
+    assert normalize_parameter_name("ssm-project") == "p-ssm-project"
+
+
 dir_here = Path(__file__).absolute().parent
 path_config = str(dir_here.joinpath("config.json"))
 path_secret_config = str(dir_here.joinpath("secret_config.json"))
@@ -110,9 +122,20 @@ class TestConfig:
             path_config=path_config,
             path_secret_config=path_secret_config,
         )
+
+        assert config.project_name_slug == "my-project"
+        assert config.project_name_snake == "my_project"
+        assert config.parameter_name == "my_project"
+
         _ = config.dev
         _ = config.int
         _ = config.prod
+
+        assert config.env.project_name_slug == "my-project"
+        assert config.env.project_name_snake == "my_project"
+        assert config.env.prefix_name_slug == "my-project-dev"
+        assert config.env.prefix_name_snake == "my_project-dev"
+        assert config.env.parameter_name == "my_project-dev"
 
 
 if __name__ == "__main__":

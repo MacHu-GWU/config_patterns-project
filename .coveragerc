@@ -8,6 +8,7 @@ omit =
     config_patterns/aws/*
     config_patterns/_version.py
     config_patterns/paths.py
+    config_patterns/compat.py
 
 [report]
 # Regexes for lines to exclude from consideration

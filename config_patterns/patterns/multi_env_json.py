@@ -254,7 +254,16 @@ class BaseConfig:
         data.update(copy.deepcopy(self.data["envs"][env_name]))
         data.update(copy.deepcopy(self.secret_data["envs"][env_name]))
         data["env_name"] = env_name
-        return self.Env(**data)
+        try:
+            return self.Env(**data)
+        except TypeError as e:
+            if "got an unexpected keyword argument" in str(e):
+                raise TypeError(
+                    f"{e}, please compare your config json file "
+                    f"to your config object definition!"
+                )
+            else:  # pragma: no cover
+                raise e
 
     @classmethod
     def get_current_env(cls) -> str:  # pragma: no cover

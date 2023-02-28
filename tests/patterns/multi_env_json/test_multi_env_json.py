@@ -137,6 +137,20 @@ class TestConfig:
         assert config.env.prefix_name_snake == "my_project-dev"
         assert config.env.parameter_name == "my_project-dev"
 
+    def test_unexpected_keyword_argument(self):
+        @dataclasses.dataclass
+        class Env(BaseEnv):
+            username: T.Optional[str] = dataclasses.field(default=None)
+
+        with pytest.raises(TypeError) as e:
+            Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                path_config=path_config,
+                path_secret_config=path_secret_config,
+            ).get_env(EnvEnum.dev.value)
+            assert "please compare your config json file" in str(e)
+
 
 if __name__ == "__main__":
     from config_patterns.tests import run_cov_test

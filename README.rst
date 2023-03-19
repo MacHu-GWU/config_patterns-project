@@ -15,7 +15,7 @@
 .. image:: https://img.shields.io/pypi/l/config_patterns.svg
     :target: https://pypi.python.org/pypi/config_patterns
 
-.. image:: https://img.shields.io/pypi/pyversions/config_patterns.svg
+.. .. image:: https://img.shields.io/pypi/pyversions/config_patterns.svg
     :target: https://pypi.python.org/pypi/config_patterns
 
 .. image:: https://img.shields.io/badge/STAR_Me_on_GitHub!--None.svg?style=social
@@ -24,13 +24,13 @@
 ------
 
 
-.. image:: https://img.shields.io/badge/Link-Document-blue.svg
+.. .. image:: https://img.shields.io/badge/Link-Document-blue.svg
     :target: https://config_patterns.readthedocs.io/index.html
 
-.. image:: https://img.shields.io/badge/Link-API-blue.svg
+.. .. image:: https://img.shields.io/badge/Link-API-blue.svg
     :target: https://config_patterns.readthedocs.io/py-modindex.html
 
-.. image:: https://img.shields.io/badge/Link-Source_Code-blue.svg
+.. .. image:: https://img.shields.io/badge/Link-Source_Code-blue.svg
     :target: https://config_patterns.readthedocs.io/py-modindex.html
 
 .. image:: https://img.shields.io/badge/Link-Install-blue.svg

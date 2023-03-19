@@ -161,6 +161,23 @@ class BaseEnv:
 
 
 @dataclasses.dataclass
+class ConfigDeployment:
+    """
+    Represent a config deployment on remote data store.
+
+    :param uri: the unique resource identifier to the config data store.
+        for AWS, it is the ARN
+    :param data: the config data in python dict
+    :param project_name: project name
+    :param env_name: environment name
+    """
+    uri: str = dataclasses.field()
+    data: dict = dataclasses.field()
+    project_name: str = dataclasses.field()
+    env_name: str = dataclasses.field()
+
+
+@dataclasses.dataclass
 class BaseConfig:
     """
     The base class for multi-environment config object.
@@ -414,7 +431,8 @@ class BaseConfig:
         bsm: "boto_session_manager.BotoSesManager",
         parameter_with_encryption: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
-    ):  # pragma: no cover
+        tags: T.Optional[T.Dict[str, str]] = None,
+    ) -> T.List[T.Optional[ConfigDeployment]]:  # pragma: no cover
         """
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
@@ -430,6 +448,7 @@ class BaseConfig:
 
             this function should ONLY run from the project admin's trusted laptop.
         """
+        config_deployment_list: T.List[T.Optional[ConfigDeployment]] = list()
         if parameter_with_encryption is not None:
             # validate arguments
             if not (
@@ -445,43 +464,73 @@ class BaseConfig:
                 project_name,
                 env_name,
             ) in parameter_list:
+                if tags is None:
+                    tags = dict(
+                        ProjectName=project_name,
+                        EnvName=env_name,
+                    )
                 deploy_parameter(
                     bsm=bsm,
                     parameter_name=parameter_name,
                     parameter_data=parameter_data,
                     parameter_with_encryption=parameter_with_encryption,
-                    tags=dict(
-                        ProjectName=project_name,
-                        EnvName=env_name,
-                    ),
+                    tags=tags,
                 )
+                config_deployment_list.append(
+                    ConfigDeployment(
+                        uri=f"arn:aws:ssm:{bsm.aws_region}:{bsm.aws_account_id}:parameter/{parameter_name}",
+                        data=parameter_data,
+                        project_name=project_name,
+                        env_name=env_name,
+                    )
+                )
+            return config_deployment_list
         elif s3dir_config is not None:
             if not s3dir_config.endswith("/"):
                 raise ValueError(
                     "s3dir_config has to be a folder and end with /, "
-                    "a valid example: s3://my-bucket/my-project/."
+                    "a valid example: 's3://my-bucket/my-project/'."
                 )
             parameter_list = self._prepare_deploy()
-            deploy_config(
-                bsm=bsm,
-                s3path_config=f"{s3dir_config}all.json",
-                config_data=parameter_list[0][1],
-                tags=dict(
-                    ProjectName=parameter_list[0][2],
-                    EnvName=parameter_list[0][3],
-                ),
-            )
+            # s3_uri = deploy_config(
+            #     bsm=bsm,
+            #     s3path_config=f"{s3dir_config}all.json",
+            #     config_data=parameter_list[0][1],
+            #     tags=dict(
+            #         ProjectName=parameter_list[0][2],
+            #         EnvName=parameter_list[0][3],
+            #     ),
+            # )
+            # config_deployment_list.append(
+            #     ConfigDeployment(
+            #         uri=s3_uri,
+            #         data=parameter_list[0][1],
+            #         project_name=parameter_list[0][2],
+            #         env_name=parameter_list[0][3],
+            #     )
+            # )
 
-            for _, parameter_data, project_name, env_name in parameter_list[1:]:
-                deploy_config(
-                    bsm=bsm,
-                    s3path_config=f"{s3dir_config}{env_name}.json",
-                    config_data=parameter_data,
-                    tags=dict(
+            for parameter_name, parameter_data, project_name, env_name in parameter_list:
+                if tags is None:
+                    tags = dict(
                         ProjectName=project_name,
                         EnvName=env_name,
-                    ),
+                    )
+                s3_uri = deploy_config(
+                    bsm=bsm,
+                    s3path_config=f"{s3dir_config}{parameter_name}.json",
+                    config_data=parameter_data,
+                    tags=tags,
                 )
+                config_deployment_list.append(
+                    ConfigDeployment(
+                        uri=s3_uri,
+                        data=parameter_data,
+                        project_name=project_name,
+                        env_name=env_name,
+                    )
+                )
+            return config_deployment_list
         else:
             raise ValueError(
                 "The arguments has to meet one of these criteria:\n"
@@ -528,15 +577,15 @@ class BaseConfig:
                     "a valid example: s3://my-bucket/my-project/."
                 )
             parameter_list = self._prepare_deploy()
-            delete_config(
-                bsm=bsm,
-                s3path_config=f"{s3dir_config}all.json",
-            )
+            # delete_config(
+            #     bsm=bsm,
+            #     s3path_config=f"{s3dir_config}{pro}.json",
+            # )
 
-            for _, _, _, env_name in parameter_list[1:]:
+            for parameter_name, _, _, _ in parameter_list:
                 delete_config(
                     bsm=bsm,
-                    s3path_config=f"{s3dir_config}{env_name}.json",
+                    s3path_config=f"{s3dir_config}{parameter_name}.json",
                 )
         else:
             raise ValueError(

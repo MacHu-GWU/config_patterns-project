@@ -40,7 +40,8 @@ def deploy_config(
     kwargs = dict(
         Bucket=bucket,
         Key=key,
-        Body=json.dumps(config_data),
+        Body=json.dumps(config_data, indent=4),
+        ContentType="application/json",
     )
     if tags:
         tagging = "&".join([

@@ -1,5 +1,5 @@
 
-.. image:: https://readthedocs.org/projects/config_patterns/badge/?version=latest
+.. .. image:: https://readthedocs.org/projects/config_patterns/badge/?version=latest
     :target: https://config_patterns.readthedocs.io/index.html
     :alt: Documentation Status
 
@@ -15,14 +15,13 @@
 .. image:: https://img.shields.io/pypi/l/config_patterns.svg
     :target: https://pypi.python.org/pypi/config_patterns
 
-.. .. image:: https://img.shields.io/pypi/pyversions/config_patterns.svg
+.. image:: https://img.shields.io/pypi/pyversions/config_patterns.svg
     :target: https://pypi.python.org/pypi/config_patterns
 
 .. image:: https://img.shields.io/badge/STAR_Me_on_GitHub!--None.svg?style=social
     :target: https://github.com/MacHu-GWU/config_patterns-project
 
 ------
-
 
 .. .. image:: https://img.shields.io/badge/Link-Document-blue.svg
     :target: https://config_patterns.readthedocs.io/index.html

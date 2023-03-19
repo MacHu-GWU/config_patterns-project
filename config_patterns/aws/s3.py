@@ -20,14 +20,14 @@ def deploy_config(
     s3path_config: str,
     config_data: dict,
     tags: T.Optional[dict] = None,
-):
+) -> str:
     """
     Deploy config to AWS S3
 
-    :param bsm:
-    :param s3dir_config:
-    :param config_data:
-    :param tags:
+    :param bsm: the ``boto_session_manager.BotoSesManager`` object.
+    :param s3path_config: s3 object uri for config json file.
+    :param config_data: config data.
+    :param tags: optional key value tags.
     """
     parts = s3path_config.split("/", 3)
     bucket = parts[2]
@@ -50,18 +50,23 @@ def deploy_config(
         kwargs["Tagging"] = tagging
     bsm.s3_client.put_object(**kwargs)
     print("done!")
+    return f"s3://{bucket}/{key}"
 
 
 def delete_config(
     bsm: "boto_session_manager.BotoSesManager",
     s3path_config: str,
-):
+) -> bool:
     """
     Delete config from AWS S3
 
     Ref:
 
     - https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.delete_object
+
+    :return: a boolean value indicating whether a deletion happened.
+
+    TODO: do a test when the config file doesn't exist.
     """
     parts = s3path_config.split("/", 3)
     bucket = parts[2]
@@ -77,3 +82,4 @@ def delete_config(
     )
 
     print("done!")
+    return True

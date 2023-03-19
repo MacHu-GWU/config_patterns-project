@@ -21,15 +21,15 @@ def deploy_parameter(
     parameter_data: dict,
     parameter_with_encryption: bool,
     tags: T.Optional[dict] = None,
-):
+) -> T.Optional["pysecret.Parameter"]:
     """
     Deploy (Create or Update) AWS SSM parameter store.
 
-    :param bsm:
-    :param parameter_name:
-    :param parameter_data:
-    :param parameter_with_encryption:
-    :param tags:
+    :param bsm: the ``boto_session_manager.BotoSesManager`` object.
+    :param parameter_name: parameter name.
+    :param parameter_data: parameter data in python dict.
+    :param parameter_with_encryption: do you want to encrypt the data at rest?
+    :param tags: optional key value tags.
     """
     aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
     print(f"🚀️ deploy SSM Parameter {parameter_name!r} ...")
@@ -49,18 +49,21 @@ def deploy_parameter(
     else:
         print(f"successfully deployed version {parameter.Version}")
     print("done!")
+    return parameter
 
 
 def delete_parameter(
     bsm: "boto_session_manager.BotoSesManager",
     parameter_name: str,
-):
+) -> bool:
     """
     Delete AWS SSM parameter.
 
     Ref:
 
     - https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/ssm.html#SSM.Client.delete_parameter
+
+    :return: a boolean value indicating whether a deletion happened.
     """
     aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
     print(f"🗑️ delete SSM Parameter {parameter_name!r} ...")
@@ -68,10 +71,13 @@ def delete_parameter(
 
     try:
         bsm.ssm_client.delete_parameter(Name=parameter_name)
+        delete_happened = True
     except Exception as e:
         if "ParameterNotFound" in str(e):
             print("not exists, do nothing.")
+            delete_happened = False
         else:
             raise e
 
     print("done!")
+    return delete_happened

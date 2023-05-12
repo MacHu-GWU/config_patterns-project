@@ -476,6 +476,10 @@ class BaseConfig:
                     parameter_with_encryption=parameter_with_encryption,
                     tags=tags,
                 )
+                if parameter_name.startswith("/"): # pragma: no cover
+                    parameter_name_for_arn = parameter_name[1:]
+                else:
+                    parameter_name_for_arn = parameter_name
                 config_deployment_list.append(
                     ConfigDeployment(
                         uri=f"arn:aws:ssm:{bsm.aws_region}:{bsm.aws_account_id}:parameter/{parameter_name}",
@@ -492,23 +496,6 @@ class BaseConfig:
                     "a valid example: 's3://my-bucket/my-project/'."
                 )
             parameter_list = self._prepare_deploy()
-            # s3_uri = deploy_config(
-            #     bsm=bsm,
-            #     s3path_config=f"{s3dir_config}all.json",
-            #     config_data=parameter_list[0][1],
-            #     tags=dict(
-            #         ProjectName=parameter_list[0][2],
-            #         EnvName=parameter_list[0][3],
-            #     ),
-            # )
-            # config_deployment_list.append(
-            #     ConfigDeployment(
-            #         uri=s3_uri,
-            #         data=parameter_list[0][1],
-            #         project_name=parameter_list[0][2],
-            #         env_name=parameter_list[0][3],
-            #     )
-            # )
 
             for parameter_name, parameter_data, project_name, env_name in parameter_list:
                 if tags is None:

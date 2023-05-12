@@ -179,6 +179,7 @@ class ConfigDeployment:
     :param deployment: the deployment object, it can be either AWS Parameter or S3 Object
     :param deletion: whether there is a deletion happened
     """
+
     parameter_name: str = dataclasses.field()
     parameter_data: dict = dataclasses.field()
     project_name: str = dataclasses.field()
@@ -498,7 +499,7 @@ class BaseConfig:
                 "to indicate that you want to read from AWS S3.\n"
             )
 
-    def prepare_deploy(self) -> T.List[ConfigDeployment]:  # pragma: no cover
+    def prepare_deploy(self) -> T.List[ConfigDeployment]:
         """
         split the consolidated config into per environment config.
 
@@ -552,7 +553,7 @@ class BaseConfig:
         s3dir_config: T.Optional[str] = None,
         tags: T.Optional[T.Dict[str, str]] = None,
         verbose: bool = True,
-    ) -> T.List[ConfigDeployment]:  # pragma: no cover
+    ) -> T.List[ConfigDeployment]:
         """
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
@@ -578,7 +579,7 @@ class BaseConfig:
                 (parameter_with_encryption is True)
                 or (parameter_with_encryption is False)
             ):
-                raise ValueError
+                raise ValueError("parameter_with_encryption has to be True or False!")
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
                 deployment.deploy_to_ssm_parameter(
@@ -613,7 +614,7 @@ class BaseConfig:
         use_parameter_store: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
         verbose: bool = True,
-    ):  # pragma: no cover
+    ):
         """
         Delete the all project config of all environments from configuration store.
 

@@ -5,6 +5,8 @@ import pytest
 import dataclasses
 from pathlib import Path
 
+import moto
+from boto_session_manager import BotoSesManager
 from config_patterns.patterns.multi_env_json import (
     validate_project_name,
     validate_env_name,
@@ -13,6 +15,7 @@ from config_patterns.patterns.multi_env_json import (
     BaseEnv,
     BaseConfig,
 )
+from config_patterns.logger import logger
 
 
 class EnvEnum(BaseEnvEnum):
@@ -150,6 +153,80 @@ class TestConfig:
                 path_secret_config=path_secret_config,
             ).get_env(EnvEnum.dev.value)
             assert "please compare your config json file" in str(e)
+
+
+class TestDeployment:
+    mock_dynamodb = None
+    bsm: BotoSesManager = None
+    use_mock: bool = True
+
+    @classmethod
+    def setup_class(cls):
+        if cls.use_mock:
+            cls.mock_ssm = moto.mock_ssm()
+            cls.mock_s3 = moto.mock_s3()
+            cls.mock_ssm.start()
+            cls.mock_s3.start()
+        cls.bsm = BotoSesManager(region_name="us-east-1")
+        cls.bsm.s3_client.create_bucket(Bucket="my-bucket")
+
+    @classmethod
+    def teardown_class(cls):
+        if cls.use_mock:
+            cls.mock_ssm.stop()
+            cls.mock_s3.stop()
+
+    def _test(self):
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            path_config=path_config,
+            path_secret_config=path_secret_config,
+        )
+
+        config.delete(bsm=self.bsm, use_parameter_store=True)
+        config.deploy(bsm=self.bsm, parameter_with_encryption=True)
+        config1 = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name=config.parameter_name,
+            parameter_with_encryption=True,
+        )
+        assert config1.data == config.data
+        assert config1.secret_data == config.secret_data
+        config.deploy(bsm=self.bsm, parameter_with_encryption=True)
+        config.delete(bsm=self.bsm, use_parameter_store=True)
+
+        s3dir_config = "s3://my-bucket/my-project/"
+        config.delete(bsm=self.bsm, s3dir_config=s3dir_config)
+        config.deploy(bsm=self.bsm, s3dir_config=s3dir_config)
+        config1 = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            s3path_config=f"{s3dir_config}{config.parameter_name}.json",
+        )
+        assert config1.data == config.data
+        assert config1.secret_data == config.secret_data
+        config.deploy(bsm=self.bsm, s3dir_config=s3dir_config)
+        config.delete(bsm=self.bsm, s3dir_config=s3dir_config)
+
+        with pytest.raises(ValueError):
+            config.delete(bsm=self.bsm)
+
+        with pytest.raises(ValueError):
+            config.deploy(bsm=self.bsm, parameter_with_encryption="YES")
+
+        with pytest.raises(ValueError):
+            config.deploy(bsm=self.bsm)
+
+    def test(self):
+        with logger.disabled(
+            disable=True,
+            # disable=False,
+        ):
+            self._test()
 
 
 if __name__ == "__main__":

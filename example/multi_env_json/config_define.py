@@ -8,6 +8,7 @@ from config_patterns.patterns.multi_env_json import (
     BaseEnvEnum,
     BaseEnv,
     BaseConfig,
+    normalize_parameter_name,
 )
 
 
@@ -21,6 +22,10 @@ class EnvEnum(BaseEnvEnum):
 class Env(BaseEnv):
     username: T.Optional[str] = dataclasses.field(default=None)
     password: T.Optional[str] = dataclasses.field(default=None)
+
+    @property
+    def parameter_name(self) -> str:
+        return f"/app/{normalize_parameter_name(self.prefix_name_snake)}"
 
 
 @dataclasses.dataclass
@@ -40,3 +45,7 @@ class Config(BaseConfig):
     @classmethod
     def get_current_env(cls) -> str:
         return EnvEnum.dev.value
+
+    @property
+    def parameter_name(self) -> str:
+        return f"/app/{normalize_parameter_name(self.project_name_snake)}"

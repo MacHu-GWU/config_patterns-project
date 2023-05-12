@@ -21,23 +21,33 @@ config = Config.read(
     path_config=path_config,
     path_secret_config=path_secret_config,
 )
-rprint(config)
+# rprint(config)
 
 
-# Deploy config to AWS Parameter Store
-bsm = BotoSesManager(profile_name="aws_data_lab_sanhe_us_east_1")
-s3dir_config = "s3://669508176277-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
+bsm = BotoSesManager(profile_name="opensource")
 
-
-deployment_list = config.deploy(
+# --- Deploy config to AWS Parameter Store
+config.delete(
     bsm=bsm,
-    parameter_with_encryption=True,
+    use_parameter_store=True,
 )
-rprint(deployment_list)
+# deployment_list = config.deploy(
+#     bsm=bsm,
+#     parameter_with_encryption=True,
+#     verbose=False,
+# )
+# rprint(deployment_list)
 
-# Deploy config to AWS S3 Store
-deployment_list = config.deploy(
+# --- Deploy config to AWS S3 Store
+s3dir_config = f"s3://{bsm.aws_account_id}-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
+config.delete(
     bsm=bsm,
     s3dir_config=s3dir_config,
+    verbose=False,
 )
-rprint(deployment_list)
+# deployment_list = config.deploy(
+#     bsm=bsm,
+#     s3dir_config=s3dir_config,
+#     verbose=False,
+# )
+# rprint(deployment_list)

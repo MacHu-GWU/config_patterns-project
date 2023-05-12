@@ -15,6 +15,17 @@ Backlog (TODO)
 **Miscellaneous**
 
 
+0.4.1 (2023-05-12)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Features and Improvements**
+
+- the :mod:`config_pattern.patterns.multi_env_json` now support deploying to multiple AWS Account with different AWS profiles.
+
+**Minor Improvements**
+
+- refactor the :mod:`config_pattern.patterns.multi_env_json` to make it more maintainable.
+
+
 0.3.3 (2023-03-19)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Minor Improvements**

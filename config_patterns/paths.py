@@ -3,16 +3,9 @@
 import sys
 from pathlib import Path
 
-dir_project_root = Path(__file__).absolute().parent.parent
-
-
-# # ------------------------------------------------------------------------------
-# # Config Management Related
-# # ------------------------------------------------------------------------------
-# dir_config = dir_project_root / "config"
-# path_config_json = dir_config / "config.json"
-# path_config_secret_json = dir_home_project_root / "config-secret.json"
-# path_current_env_name_json = dir_project_root / ".current-env-name.json"
+dir_python_lib = Path(__file__).absolute().parent
+PACKAGE_NAME = dir_python_lib.name
+dir_project_root = dir_python_lib.parent
 
 # ------------------------------------------------------------------------------
 # Virtual Environment Related

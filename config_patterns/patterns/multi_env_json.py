@@ -20,11 +20,11 @@ try:
     import aws_console_url
 
     from ..aws.ssm import deploy_parameter, delete_parameter
-    from ..aws.s3 import deploy_config, delete_config
+    from ..aws.s3 import deploy_config, delete_config, S3Object
 except ImportError:  # pragma: no cover
     pass
 
-
+from ..logger import logger
 from ..jsonutils import json_loads
 from ..compat import cached_property
 from ..vendor.strutils import camel2under, slugify
@@ -165,16 +165,128 @@ class ConfigDeployment:
     """
     Represent a config deployment on remote data store.
 
-    :param uri: the unique resource identifier to the config data store.
-        for AWS, it is the ARN
-    :param data: the config data in python dict
+    It has the following methods:
+
+    - :meth:`~ConfigDeployment.deploy_to_ssm_parameter`
+    - :meth:`~ConfigDeployment.deploy_to_s3`
+    - :meth:`~ConfigDeployment.delete_from_ssm_parameter`
+    - :meth:`~ConfigDeployment.delete_from_s3`
+
+    :param parameter_name: the logic name of this deployment
+    :param parameter_data: the config data in python dict
     :param project_name: project name
     :param env_name: environment name
+    :param deployment: the deployment object, it can be either AWS Parameter or S3 Object
+    :param deletion: whether there is a deletion happened
     """
-    uri: str = dataclasses.field()
-    data: dict = dataclasses.field()
+    parameter_name: str = dataclasses.field()
+    parameter_data: dict = dataclasses.field()
     project_name: str = dataclasses.field()
     env_name: str = dataclasses.field()
+    deployment: T.Optional[T.Union["pysecret.Parameter", S3Object]] = dataclasses.field(
+        default=None
+    )
+    deletion: T.Optional[bool] = dataclasses.field(default=None)
+
+    @property
+    def parameter_name_for_arn(self) -> str:
+        """
+        Return the parameter name for ARN. The parameter name could have
+        a leading "/", in this case, we should strip it out.
+        """
+        if self.parameter_name.startswith("/"):  # pragma: no cover
+            return self.parameter_name[1:]
+        else:
+            return self.parameter_name
+
+    def deploy_to_ssm_parameter(
+        self,
+        bsm: "boto_session_manager.BotoSesManager",
+        parameter_with_encryption: bool,
+        tags: T.Optional[T.Dict[str, str]] = None,
+        verbose: bool = True,
+    ):
+        """
+        Deploy config to AWS SSM Parameter Store.
+        """
+        if tags is None:
+            tags = dict(
+                ProjectName=self.project_name,
+                EnvName=self.env_name,
+            )
+        with logger.disabled(
+            disable=not verbose,
+        ):
+            self.deployment = deploy_parameter(
+                bsm=bsm,
+                parameter_name=self.parameter_name,
+                parameter_data=self.parameter_data,
+                parameter_with_encryption=parameter_with_encryption,
+                tags=tags,
+            )
+            return self.deployment
+
+    def deploy_to_s3(
+        self,
+        bsm: "boto_session_manager.BotoSesManager",
+        s3dir_config: str,
+        tags: T.Optional[T.Dict[str, str]] = None,
+        verbose: bool = True,
+    ):
+        """
+        Deploy config to AWS S3.
+        """
+        if tags is None:
+            tags = dict(
+                ProjectName=self.project_name,
+                EnvName=self.env_name,
+            )
+        with logger.disabled(
+            disable=not verbose,
+        ):
+            self.deployment = deploy_config(
+                bsm=bsm,
+                s3path_config=f"{s3dir_config}{self.parameter_name_for_arn}.json",
+                config_data=self.parameter_data,
+                tags=tags,
+            )
+            return self.deployment
+
+    def delete_from_ssm_parameter(
+        self,
+        bsm: "boto_session_manager.BotoSesManager",
+        verbose: bool = True,
+    ):
+        """
+        Delete config from AWS SSM Parameter Store.
+        """
+        with logger.disabled(
+            disable=not verbose,
+        ):
+            self.deletion = delete_parameter(
+                bsm=bsm,
+                parameter_name=self.parameter_name,
+            )
+            return self.deletion
+
+    def delete_from_s3(
+        self,
+        bsm: "boto_session_manager.BotoSesManager",
+        s3dir_config: str,
+        verbose: bool = True,
+    ):
+        """
+        Delete config from AWS S3.
+        """
+        with logger.disabled(
+            disable=not verbose,
+        ):
+            s3_uri = f"{s3dir_config}{self.parameter_name_for_arn}.json"
+            self.deletion = delete_config(
+                bsm=bsm,
+                s3path_config=s3_uri,
+            )
+            return self.deletion
 
 
 @dataclasses.dataclass
@@ -386,23 +498,25 @@ class BaseConfig:
                 "to indicate that you want to read from AWS S3.\n"
             )
 
-    def _prepare_deploy(
-        self,
-    ) -> T.List[T.Tuple[str, dict, str, str]]:  # pragma: no cover
+    def prepare_deploy(self) -> T.List[ConfigDeployment]:  # pragma: no cover
         """
         split the consolidated config into per environment config.
 
-        :return a list of tuple, each tuple has four item: 1. parameter_name,
-            2. parameter_data, 3. project_name, 4. env_name.
+        :return a list of deployment.
         """
-        parameter_list: T.List[T.Tuple[str, dict, str, str]] = list()
+        deployment_list: T.List[ConfigDeployment] = list()
 
         # manually add all env parameter, the name is project_name only
         # without env_name
         parameter_name = self.parameter_name
         parameter_data = {"data": self.data, "secret_data": self.secret_data}
-        parameter_list.append(
-            (parameter_name, parameter_data, self.project_name, "all")
+        deployment_list.append(
+            ConfigDeployment(
+                parameter_name=parameter_name,
+                parameter_data=parameter_data,
+                project_name=self.project_name,
+                env_name="all",
+            )
         )
 
         # add per env parameter
@@ -420,11 +534,16 @@ class BaseConfig:
                     "envs": {env.env_name: self.secret_data["envs"][env.env_name]},
                 },
             }
-            parameter_list.append(
-                (parameter_name, parameter_data, env.project_name, env.env_name)
+            deployment_list.append(
+                ConfigDeployment(
+                    parameter_name=parameter_name,
+                    parameter_data=parameter_data,
+                    project_name=env.project_name,
+                    env_name=env.env_name,
+                )
             )
 
-        return parameter_list
+        return deployment_list
 
     def deploy(
         self,
@@ -432,7 +551,8 @@ class BaseConfig:
         parameter_with_encryption: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
         tags: T.Optional[T.Dict[str, str]] = None,
-    ) -> T.List[T.Optional[ConfigDeployment]]:  # pragma: no cover
+        verbose: bool = True,
+    ) -> T.List[ConfigDeployment]:  # pragma: no cover
         """
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
@@ -440,15 +560,18 @@ class BaseConfig:
         1. deploy to AWS Parameter Store
         2. deploy to AWS S3
 
-        :param bsm:
-        :param parameter_with_encryption:
-        :param s3dir_config:
-
         Note:
 
             this function should ONLY run from the project admin's trusted laptop.
+
+        :param bsm:
+        :param parameter_with_encryption:
+        :param s3dir_config:
+        :param tags:
+        :param verbose:
+
+        :return: a list of :class:`ConfigDeployment`.
         """
-        config_deployment_list: T.List[T.Optional[ConfigDeployment]] = list()
         if parameter_with_encryption is not None:
             # validate arguments
             if not (
@@ -456,68 +579,25 @@ class BaseConfig:
                 or (parameter_with_encryption is False)
             ):
                 raise ValueError
-            print("deploy parameter store for all environment")
-            parameter_list = self._prepare_deploy()
-            for (
-                parameter_name,
-                parameter_data,
-                project_name,
-                env_name,
-            ) in parameter_list:
-                if tags is None:
-                    tags = dict(
-                        ProjectName=project_name,
-                        EnvName=env_name,
-                    )
-                deploy_parameter(
+            deployment_list = self.prepare_deploy()
+            for deployment in deployment_list:
+                deployment.deploy_to_ssm_parameter(
                     bsm=bsm,
-                    parameter_name=parameter_name,
-                    parameter_data=parameter_data,
                     parameter_with_encryption=parameter_with_encryption,
                     tags=tags,
+                    verbose=verbose,
                 )
-                if parameter_name.startswith("/"): # pragma: no cover
-                    parameter_name_for_arn = parameter_name[1:]
-                else:
-                    parameter_name_for_arn = parameter_name
-                config_deployment_list.append(
-                    ConfigDeployment(
-                        uri=f"arn:aws:ssm:{bsm.aws_region}:{bsm.aws_account_id}:parameter/{parameter_name}",
-                        data=parameter_data,
-                        project_name=project_name,
-                        env_name=env_name,
-                    )
-                )
-            return config_deployment_list
+            return deployment_list
         elif s3dir_config is not None:
-            if not s3dir_config.endswith("/"):
-                raise ValueError(
-                    "s3dir_config has to be a folder and end with /, "
-                    "a valid example: 's3://my-bucket/my-project/'."
-                )
-            parameter_list = self._prepare_deploy()
-
-            for parameter_name, parameter_data, project_name, env_name in parameter_list:
-                if tags is None:
-                    tags = dict(
-                        ProjectName=project_name,
-                        EnvName=env_name,
-                    )
-                s3_uri = deploy_config(
+            deployment_list = self.prepare_deploy()
+            for deployment in deployment_list:
+                deployment.deploy_to_s3(
                     bsm=bsm,
-                    s3path_config=f"{s3dir_config}{parameter_name}.json",
-                    config_data=parameter_data,
+                    s3dir_config=s3dir_config,
                     tags=tags,
+                    verbose=verbose,
                 )
-                config_deployment_list.append(
-                    ConfigDeployment(
-                        uri=s3_uri,
-                        data=parameter_data,
-                        project_name=project_name,
-                        env_name=env_name,
-                    )
-                )
-            return config_deployment_list
+            return deployment_list
         else:
             raise ValueError(
                 "The arguments has to meet one of these criteria:\n"
@@ -532,6 +612,7 @@ class BaseConfig:
         bsm: "boto_session_manager.BotoSesManager",
         use_parameter_store: T.Optional[bool] = None,
         s3dir_config: T.Optional[str] = None,
+        verbose: bool = True,
     ):  # pragma: no cover
         """
         Delete the all project config of all environments from configuration store.
@@ -544,36 +625,31 @@ class BaseConfig:
         :param bsm:
         :param use_parameter_store:
         :param s3dir_config:
+        :param verbose:
+
+        :return: a list of :class:`ConfigDeployment`.
 
         Note:
 
             this function should ONLY run from the project admin's trusted laptop.
         """
         if (bsm is not None) and (use_parameter_store is True):
-            print("delete parameter store for all environment")
-            parameter_list = self._prepare_deploy()
-            for parameter_name, _, _, _ in parameter_list:
-                delete_parameter(
+            deployment_list = self.prepare_deploy()
+            for deployment in deployment_list:
+                deployment.delete_from_ssm_parameter(
                     bsm=bsm,
-                    parameter_name=parameter_name,
+                    verbose=verbose,
                 )
+            return deployment_list
         elif (bsm is not None) and (s3dir_config is not None):
-            if not s3dir_config.endswith("/"):
-                raise ValueError(
-                    "s3dir_config has to be a folder and end with /, "
-                    "a valid example: s3://my-bucket/my-project/."
-                )
-            parameter_list = self._prepare_deploy()
-            # delete_config(
-            #     bsm=bsm,
-            #     s3path_config=f"{s3dir_config}{pro}.json",
-            # )
-
-            for parameter_name, _, _, _ in parameter_list:
-                delete_config(
+            deployment_list = self.prepare_deploy()
+            for deployment in deployment_list:
+                deployment.delete_from_s3(
                     bsm=bsm,
-                    s3path_config=f"{s3dir_config}{parameter_name}.json",
+                    s3dir_config=s3dir_config,
+                    verbose=verbose,
                 )
+            return deployment_list
         else:
             raise ValueError(
                 "The arguments has to meet one of these criteria:\n"

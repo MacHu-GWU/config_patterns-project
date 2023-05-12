@@ -14,7 +14,12 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
+from ..logger import logger
 
+
+@logger.start_and_end(
+    msg="deploy config to SSM parameter",
+)
 def deploy_parameter(
     bsm: "boto_session_manager.BotoSesManager",
     parameter_name: str,
@@ -30,10 +35,13 @@ def deploy_parameter(
     :param parameter_data: parameter data in python dict.
     :param parameter_with_encryption: do you want to encrypt the data at rest?
     :param tags: optional key value tags.
+
+    :return: a ``pysecret.Parameter`` object to indicate the deployed parameter.
+        if returns None, then no deployment happened.
     """
     aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
-    print(f"🚀️ deploy SSM Parameter {parameter_name!r} ...")
-    print(f"preview at: {aws_console.ssm.get_parameter(parameter_name)}")
+    logger.info(f"🚀️ deploy SSM Parameter {parameter_name!r} ...")
+    logger.info(f"preview at: {aws_console.ssm.get_parameter(parameter_name)}")
     parameter = pysecret.deploy_parameter(
         bsm.ssm_client,
         name=parameter_name,
@@ -45,13 +53,15 @@ def deploy_parameter(
         overwrite=True,
     )
     if parameter is None:
-        print("parameter data is the same as existing one, do nothing.")
+        logger.info("parameter data is the same as existing one, do nothing.")
     else:
-        print(f"successfully deployed version {parameter.Version}")
-    print("done!")
+        logger.info(f"successfully deployed version {parameter.Version}")
     return parameter
 
 
+@logger.start_and_end(
+    msg="delete config from SSM parameter",
+)
 def delete_parameter(
     bsm: "boto_session_manager.BotoSesManager",
     parameter_name: str,
@@ -66,18 +76,18 @@ def delete_parameter(
     :return: a boolean value indicating whether a deletion happened.
     """
     aws_console = aws_console_url.AWSConsole(aws_region=bsm.aws_region)
-    print(f"🗑️ delete SSM Parameter {parameter_name!r} ...")
-    print(f"verify at: {aws_console.ssm.get_parameter(parameter_name)}")
+    logger.info(f"🗑️ delete SSM Parameter {parameter_name!r} ...")
+    logger.info(f"verify at: {aws_console.ssm.get_parameter(parameter_name)}")
 
     try:
         bsm.ssm_client.delete_parameter(Name=parameter_name)
         delete_happened = True
     except Exception as e:
         if "ParameterNotFound" in str(e):
-            print("not exists, do nothing.")
+            logger.info("not exists, do nothing.")
             delete_happened = False
         else:
             raise e
 
-    print("done!")
+    logger.info("done!")
     return delete_happened

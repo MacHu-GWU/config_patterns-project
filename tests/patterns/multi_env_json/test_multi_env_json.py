@@ -9,7 +9,7 @@ from pathlib import Path
 import moto
 from boto_session_manager import BotoSesManager
 
-from config_patterns.patterns.multi_env_json import (
+from config_patterns.patterns.multi_env_json.impl import (
     validate_project_name,
     validate_env_name,
     normalize_parameter_name,
@@ -288,4 +288,4 @@ class TestDeployment:
 if __name__ == "__main__":
     from config_patterns.tests import run_cov_test
 
-    run_cov_test(__file__, "config_patterns.patterns.multi_env_json", preview=False)
+    run_cov_test(__file__, "config_patterns.patterns.multi_env_json.impl", preview=False)

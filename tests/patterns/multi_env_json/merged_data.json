@@ -1,43 +1,38 @@
 {
-    "_shared": {
-        "*.project_name": "my_project",
-        "*.tags.project_name": "my_project",
-        "dev.databases.port": 3306,
-        "prod.databases.port": 5432,
-        "*.servers.*.domain": "www.example.com",
-        "*.servers.*.cpu": 1
-    },
     "dev": {
         "username": "dev.user",
         "databases": [
             {
-                "host": "www.db1.com"
+                "host": "www.db1.com",
+                "port": 3306
             }
         ],
         "servers": {
-            "_shared": {
-                "*.cpu": 2
-            },
             "blue": {
                 "ip": "111.111.111.111",
-                "domain": "www.blue.com",
-                "memory": 4
+                "cpu": 2,
+                "memory": 4,
+                "domain": "www.blue.com"
             },
             "green": {
                 "ip": "111.111.111.111",
                 "cpu": 4,
-                "memory": 4
+                "memory": 4,
+                "domain": "www.example.com"
             }
         },
         "tags": {
-            "env_name": "dev"
-        }
+            "env_name": "dev",
+            "project_name": "my_project"
+        },
+        "project_name": "my_project"
     },
     "prod": {
         "username": "prod.user",
         "databases": [
             {
-                "host": "www.db2.com"
+                "host": "www.db2.com",
+                "port": 5432
             },
             {
                 "host": "www.db3.com",
@@ -45,22 +40,23 @@
             }
         ],
         "servers": {
-            "_shared": {
-                "*.domain": "www.prod.com"
-            },
             "black": {
                 "ip": "111.111.111.111",
-                "domain": "www.black.com",
-                "memory": 16
+                "cpu": 1,
+                "memory": 16,
+                "domain": "www.black.com"
             },
             "white": {
                 "ip": "111.111.111.111",
                 "cpu": 8,
-                "memory": 16
+                "memory": 16,
+                "domain": "www.prod.com"
             }
         },
         "tags": {
-            "env_name": "prod"
-        }
+            "env_name": "prod",
+            "project_name": "my_project"
+        },
+        "project_name": "my_project"
     }
 }

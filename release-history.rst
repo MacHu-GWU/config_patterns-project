@@ -15,6 +15,25 @@ Backlog (TODO)
 **Miscellaneous**
 
 
+1.0.1 (2023-05-17)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Breaking Changes**
+
+- ``1.X.Y`` is not compatible with ``0.X.Y`` at all.
+- The config json file schema is completely redesigned to embrace "inheritance hierarchy" and advanced "config merge" features.
+
+**Features and Improvements**
+
+- Allow JSON path notation to apply shared config values.
+- Allow merging dict, list of dict, deeply nested dict or list of dict.
+- Add a :mod:`~config_patterns.patterns.hierarchy` that implements "inheritance hierarchy" pattern, and can be used independently.
+- Add a :mod:`~config_patterns.patterns.merge_key_value.py` that implements "config merge" pattern, and can be used independently.
+
+**Miscellaneous**
+
+- Update the example Jupyter Notebook.
+
+
 0.4.1 (2023-05-12)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**

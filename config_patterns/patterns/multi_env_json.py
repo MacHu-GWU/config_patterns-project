@@ -79,6 +79,109 @@ def normalize_parameter_name(param_name: str) -> str:
         return param_name
 
 
+SHARED = "_shared"
+
+
+def set_shared_value(
+    path: str,
+    value: T.Any,
+    data: T.Union[list, dict],
+):
+    """
+    Set shared value to all items in a list or dict.
+    """
+    parts = path.split(".")
+    if len(parts) == 1:
+        if isinstance(data, dict):
+            data.setdefault(parts[0], value)
+        elif isinstance(data, list):
+            for item in data:
+                item.setdefault(parts[0], value)
+        else:  # pragma: no cover
+            raise NotImplementedError
+        return
+    key = parts[0]
+    if key == "*":
+        for k, v in data.items():
+            if k != SHARED:
+                set_shared_value(
+                    path=".".join(parts[1:]),
+                    value=value,
+                    data=v,
+                )
+    else:
+        if isinstance(data, dict):
+            set_shared_value(
+                path=".".join(parts[1:]),
+                value=value,
+                data=data[key],
+            )
+        elif isinstance(data, list):
+            for item in data:
+                set_shared_value(
+                    path=".".join(parts[1:]),
+                    value=value,
+                    data=item[key],
+                )
+        else:  # pragma: no cover
+            raise NotImplementedError
+
+
+def apply_shared_value(data: dict):
+    # implement recursion pattern
+    for key, value in data.items():
+        if key == SHARED:
+            continue
+        if isinstance(value, dict):
+            apply_shared_value(value)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    apply_shared_value(item)
+
+    has_shared = SHARED in data
+    if has_shared is False:
+        return
+
+    shared_data = data.pop(SHARED)
+    for path, value in shared_data.items():
+        set_shared_value(path=path, value=value, data=data)
+
+
+def merge_key_value(data1: dict, data2: dict):
+    data1 = copy.deepcopy(data1)
+    data2 = copy.deepcopy(data2)
+
+    difference = data2.keys() - data1.keys()
+    intersection = data1.keys() & data2.keys()
+
+    for key in difference:
+        data1[key] = data2[key]
+
+    for key in intersection:
+        value1, value2 = data1[key], data2[key]
+        if isinstance(value1, dict) and isinstance(value2, dict):
+            data1[key] = merge_key_value(value1, value2)
+        elif isinstance(value1, list) and isinstance(value2, list):
+            if len(value1) != len(value2):
+                raise ValueError(f"list length mismatch: key = {key!r}")
+            value = list()
+            for item1, item2 in zip(value1, value2):
+                if isinstance(item1, dict) and isinstance(item2, dict):
+                    value.append(merge_key_value(item1, item2))
+                else:
+                    raise ValueError
+            data1[key] = value
+        else:
+            raise TypeError(
+                f"type of data1[{key!r}] and type of data2[{key!r}] "
+                f"has to be both dict or list of dict to merge! "
+                f"they are {type(value1)} and {type(value2)}."
+            )
+
+    return data1
+
+
 @dataclasses.dataclass
 class BaseEnv:
     """
@@ -120,6 +223,19 @@ class BaseEnv:
         """
         self._validate()
         self.__user_post_init__()
+
+    @classmethod
+    def from_dict(cls, data: dict):  # pragma: no cover
+        """
+        Create an instance from a dict.
+        """
+        raise NotImplementedError(
+            "Implement this method create an instance of "
+            "env config. For example:\n"
+            "@classmethod\n"
+            "def from_dict(cls, data: dict):\n"
+            "    return cls(**data)\n"
+        )
 
     @cached_property
     def project_name_slug(self) -> str:
@@ -301,26 +417,24 @@ class BaseConfig:
     Example data and secret_data::
 
         >>> {
-        ...     "shared": {
+        ...     "_shared": {
         ...         "project_name": "my_project", # has to have a key called ``project_name``
         ...         "key": "value",
         ...         ...
         ...     },
-        ...     "envs": {
-        ...         "dev": {
-        ...             "key": "value",
-        ...             ...
-        ...         },
-        ...         "int": {
-        ...             "key": "value",
-        ...             ...
-        ...         },
-        ...         "prod": {
-        ...             "key": "value",
-        ...             ...
-        ...         },
+        ...     "dev": {
+        ...         "key": "value",
         ...         ...
-        ...     }
+        ...     },
+        ...     "int": {
+        ...         "key": "value",
+        ...         ...
+        ...     },
+        ...     "prod": {
+        ...         "key": "value",
+        ...         ...
+        ...     },
+        ...     ...
         ... }
     """
 
@@ -330,19 +444,30 @@ class BaseConfig:
     Env: T.Type[BaseEnv] = dataclasses.field()
     EnvEnum: T.Type[BaseEnvEnum] = dataclasses.field()
 
+    _merged_data: dict = dataclasses.field(init=False)
+    _merged_secret_data: dict = dataclasses.field(init=False)
+    _merged: dict = dataclasses.field(init=False)
+
     def _validate(self):
         """
         Validate input arguments.
         """
         validate_project_name(self.project_name)
-        for env_name in self.data["envs"]:
-            validate_env_name(env_name)
+        for env_name in self.data:
+            if env_name != "_shared":
+                validate_env_name(env_name)
+
+    def _apply_shared(self):
+        self._merged_data = copy.deepcopy(self.data)
+        self._merged_secret_data = copy.deepcopy(self.secret_data)
+        apply_shared_value(self._merged_data)
+        apply_shared_value(self._merged_secret_data)
+        self._merged = merge_key_value(self._merged_data, self._merged_secret_data)
 
     def __user_post_init__(self):
         """
         A placeholder post init function for user.
         """
-        pass
 
     def __post_init__(self):
         """
@@ -350,11 +475,12 @@ class BaseConfig:
         for any post init logics.
         """
         self._validate()
+        self._apply_shared()
         self.__user_post_init__()
 
     @cached_property
     def project_name(self) -> str:
-        return self.data["shared"]["project_name"]
+        return self.data["_shared"]["*.project_name"]
 
     @cached_property
     def project_name_slug(self) -> str:
@@ -378,14 +504,10 @@ class BaseConfig:
     # user defined subclass, which is impossible to predict.
     def get_env(self, env_name: T.Union[str, BaseEnvEnum]):
         env_name = BaseEnvEnum.ensure_str(env_name)
-        data = dict()
-        data.update(copy.deepcopy(self.data["shared"]))
-        data.update(copy.deepcopy(self.secret_data["shared"]))
-        data.update(copy.deepcopy(self.data["envs"][env_name]))
-        data.update(copy.deepcopy(self.secret_data["envs"][env_name]))
+        data = copy.deepcopy(self._merged[env_name])
         data["env_name"] = env_name
         try:
-            return self.Env(**data)
+            return self.Env.from_dict(data)
         except TypeError as e:
             if "got an unexpected keyword argument" in str(e):
                 raise TypeError(
@@ -414,7 +536,7 @@ class BaseConfig:
     # don't put type hint for return value, it should return a
     # user defined subclass, which is impossible to predict.
     @cached_property
-    def env(self):
+    def env(self):  # pragma: no cover
         """
         Access the current :class:`Env` object.
         """
@@ -525,14 +647,23 @@ class BaseConfig:
             env_name = self.EnvEnum.ensure_str(env_name)
             env = self.get_env(env_name)
             parameter_name = env.parameter_name
+
             parameter_data = {
                 "data": {
-                    "shared": self.data["shared"],
-                    "envs": {env.env_name: self.data["envs"][env.env_name]},
+                    "shared": {
+                        k: v
+                        for k, v in self.data.get("_shared", {}).items()
+                        if k.startswith("*") or k.startswith(f"{env.env_name}.")
+                    },
+                    "envs": {env.env_name: self.data[env.env_name]},
                 },
                 "secret_data": {
-                    "shared": self.secret_data["shared"],
-                    "envs": {env.env_name: self.secret_data["envs"][env.env_name]},
+                    "shared": {
+                        k: v
+                        for k, v in self.secret_data.get("_shared", {}).items()
+                        if k.startswith("*") or k.startswith(f"{env.env_name}.")
+                    },
+                    "envs": {env.env_name: self.secret_data[env.env_name]},
                 },
             }
             deployment_list.append(

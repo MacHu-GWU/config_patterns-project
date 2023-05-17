@@ -27,7 +27,9 @@ except ImportError:  # pragma: no cover
 from ..logger import logger
 from ..jsonutils import json_loads
 from ..compat import cached_property
-from ..vendor.strutils import camel2under, slugify
+from ..vendor.strutils import slugify
+from .hierarchy import apply_shared_value
+from .merge_key_value import merge_key_value
 
 
 def validate_project_name(project_name: str):
@@ -77,109 +79,6 @@ def normalize_parameter_name(param_name: str) -> str:
         return f"p-{param_name}"
     else:
         return param_name
-
-
-SHARED = "_shared"
-
-
-def set_shared_value(
-    path: str,
-    value: T.Any,
-    data: T.Union[list, dict],
-):
-    """
-    Set shared value to all items in a list or dict.
-    """
-    parts = path.split(".")
-    if len(parts) == 1:
-        if isinstance(data, dict):
-            data.setdefault(parts[0], value)
-        elif isinstance(data, list):
-            for item in data:
-                item.setdefault(parts[0], value)
-        else:  # pragma: no cover
-            raise NotImplementedError
-        return
-    key = parts[0]
-    if key == "*":
-        for k, v in data.items():
-            if k != SHARED:
-                set_shared_value(
-                    path=".".join(parts[1:]),
-                    value=value,
-                    data=v,
-                )
-    else:
-        if isinstance(data, dict):
-            set_shared_value(
-                path=".".join(parts[1:]),
-                value=value,
-                data=data[key],
-            )
-        elif isinstance(data, list):
-            for item in data:
-                set_shared_value(
-                    path=".".join(parts[1:]),
-                    value=value,
-                    data=item[key],
-                )
-        else:  # pragma: no cover
-            raise NotImplementedError
-
-
-def apply_shared_value(data: dict):
-    # implement recursion pattern
-    for key, value in data.items():
-        if key == SHARED:
-            continue
-        if isinstance(value, dict):
-            apply_shared_value(value)
-        if isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict):
-                    apply_shared_value(item)
-
-    has_shared = SHARED in data
-    if has_shared is False:
-        return
-
-    shared_data = data.pop(SHARED)
-    for path, value in shared_data.items():
-        set_shared_value(path=path, value=value, data=data)
-
-
-def merge_key_value(data1: dict, data2: dict):
-    data1 = copy.deepcopy(data1)
-    data2 = copy.deepcopy(data2)
-
-    difference = data2.keys() - data1.keys()
-    intersection = data1.keys() & data2.keys()
-
-    for key in difference:
-        data1[key] = data2[key]
-
-    for key in intersection:
-        value1, value2 = data1[key], data2[key]
-        if isinstance(value1, dict) and isinstance(value2, dict):
-            data1[key] = merge_key_value(value1, value2)
-        elif isinstance(value1, list) and isinstance(value2, list):
-            if len(value1) != len(value2):
-                raise ValueError(f"list length mismatch: key = {key!r}")
-            value = list()
-            for item1, item2 in zip(value1, value2):
-                if isinstance(item1, dict) and isinstance(item2, dict):
-                    value.append(merge_key_value(item1, item2))
-                else:
-                    raise ValueError
-            data1[key] = value
-        else:
-            raise TypeError(
-                f"type of data1[{key!r}] and type of data2[{key!r}] "
-                f"has to be both dict or list of dict to merge! "
-                f"they are {type(value1)} and {type(value2)}."
-            )
-
-    return data1
 
 
 @dataclasses.dataclass

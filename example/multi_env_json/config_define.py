@@ -27,6 +27,10 @@ class Env(BaseEnv):
     def parameter_name(self) -> str:
         return f"/app/{normalize_parameter_name(self.prefix_name_snake)}"
 
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(**data)
+
 
 @dataclasses.dataclass
 class Config(BaseConfig):

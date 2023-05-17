@@ -27,6 +27,7 @@ from ...logger import logger
 from ...jsonutils import json_loads
 from ...compat import cached_property
 from ...vendor.strutils import slugify
+from ...vendor.better_enum import BetterStrEnum
 from ..hierarchy import apply_shared_value
 from ..merge_key_value import merge_key_value
 
@@ -47,7 +48,7 @@ def validate_env_name(env_name: str):
         raise ValueError("env_name can only has a-z, 0-9")
 
 
-class BaseEnvEnum(str, enum.Enum):
+class BaseEnvEnum(BetterStrEnum):
     """
     Base per environment enumeration base class.
 
@@ -56,13 +57,6 @@ class BaseEnvEnum(str, enum.Enum):
     Valid examples are: dev, test, prod, stage1, stage2,
     Invalid examples are: my_dev, 1dev
     """
-
-    @classmethod
-    def ensure_str(cls, value: T.Union[str, "BaseEnvEnum"]) -> str:
-        if isinstance(value, cls):
-            return value.value
-        else:
-            return value
 
 
 def normalize_parameter_name(param_name: str) -> str:
@@ -401,7 +395,7 @@ class BaseConfig:
     # don't put type hint for return value, it should return a
     # user defined subclass, which is impossible to predict.
     def get_env(self, env_name: T.Union[str, BaseEnvEnum]):
-        env_name = BaseEnvEnum.ensure_str(env_name)
+        env_name = self.EnvEnum.ensure_str(env_name)
         data = copy.deepcopy(self._merged[env_name])
         data["env_name"] = env_name
         try:
@@ -422,6 +416,20 @@ class BaseConfig:
         should deal with. For example, you can define the git feature branch
         will become the dev env; the master branch will become the int env;
         the release branch will become prod env;
+
+        Example::
+
+            class Config(BaseConfig):
+                ...
+
+                @classmethod
+                def get_current_env(cls) -> str:
+                    if "CI" in os.environ:
+                        return EnvEnum.test.value
+                    elif "AWS_LAMBDA_FUNCTION_NAME" in os.environ:
+                        return EnvEnum.prod.value
+                    else:
+                        return EnvEnum.dev.value
         """
         raise NotImplementedError(
             "You have to implement this method to detect what environment "

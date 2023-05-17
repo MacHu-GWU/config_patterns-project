@@ -549,20 +549,20 @@ class BaseConfig:
 
             parameter_data = {
                 "data": {
-                    "shared": {
+                    "_shared": {
                         k: v
                         for k, v in self.data.get("_shared", {}).items()
                         if k.startswith("*") or k.startswith(f"{env.env_name}.")
                     },
-                    "envs": {env.env_name: self.data[env.env_name]},
+                    env.env_name: self.data[env.env_name],
                 },
                 "secret_data": {
-                    "shared": {
+                    "_shared": {
                         k: v
                         for k, v in self.secret_data.get("_shared", {}).items()
                         if k.startswith("*") or k.startswith(f"{env.env_name}.")
                     },
-                    "envs": {env.env_name: self.secret_data[env.env_name]},
+                    env.env_name: self.secret_data[env.env_name],
                 },
             }
             deployment_list.append(

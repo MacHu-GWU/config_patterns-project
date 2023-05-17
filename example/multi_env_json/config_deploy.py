@@ -30,21 +30,31 @@ bsm = BotoSesManager(profile_name="opensource")
 config.delete(
     bsm=bsm,
     use_parameter_store=True,
+    verbose=True,
 )
-# deployment_list = config.deploy(
+deployment_list = config.deploy(
+    bsm=bsm,
+    parameter_with_encryption=True,
+    verbose=True,
+)
+# config = Config.read(
+#     env_class=Env,
+#     env_enum_class=EnvEnum,
 #     bsm=bsm,
+#     parameter_name="/app/my_project-dev",
 #     parameter_with_encryption=True,
-#     verbose=False,
 # )
+# print(config.dev.username)
+# print(config.dev.password)
 # rprint(deployment_list)
 
 # --- Deploy config to AWS S3 Store
 s3dir_config = f"s3://{bsm.aws_account_id}-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
-config.delete(
-    bsm=bsm,
-    s3dir_config=s3dir_config,
-    verbose=False,
-)
+# config.delete(
+#     bsm=bsm,
+#     s3dir_config=s3dir_config,
+#     verbose=False,
+# )
 # deployment_list = config.deploy(
 #     bsm=bsm,
 #     s3dir_config=s3dir_config,

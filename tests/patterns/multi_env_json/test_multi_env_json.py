@@ -149,8 +149,8 @@ def test_normalize_parameter_name():
 dir_here = Path(__file__).absolute().parent
 path_config = str(dir_here.joinpath("config.json"))
 path_secret_config = str(dir_here.joinpath("secret_config.json"))
-path_merged_data = str(dir_here.joinpath("merged_data.json"))
-path_merged_secret_data = str(dir_here.joinpath("merged_secret_data.json"))
+path_applied_data = str(dir_here.joinpath("applied_data.json"))
+path_applied_secret_data = str(dir_here.joinpath("applied_secret_data.json"))
 path_merged = str(dir_here.joinpath("merged.json"))
 
 
@@ -168,9 +168,8 @@ class TestConfig:
             path_config=path_config,
             path_secret_config=path_secret_config,
         )
-
-        assert config._merged_data == json.load(open(path_merged_data))
-        assert config._merged_secret_data == json.load(open(path_merged_secret_data))
+        assert config._applied_data == json.load(open(path_applied_data))
+        assert config._applied_secret_data == json.load(open(path_applied_secret_data))
         assert config._merged == json.load(open(path_merged))
 
         assert config.project_name_slug == "my-project"

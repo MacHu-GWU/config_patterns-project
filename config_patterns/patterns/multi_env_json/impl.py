@@ -342,8 +342,8 @@ class BaseConfig:
     Env: T.Type[BaseEnv] = dataclasses.field()
     EnvEnum: T.Type[BaseEnvEnum] = dataclasses.field()
 
-    _merged_data: dict = dataclasses.field(init=False)
-    _merged_secret_data: dict = dataclasses.field(init=False)
+    _applied_data: dict = dataclasses.field(init=False)
+    _applied_secret_data: dict = dataclasses.field(init=False)
     _merged: dict = dataclasses.field(init=False)
 
     def _validate(self):
@@ -356,11 +356,11 @@ class BaseConfig:
                 validate_env_name(env_name)
 
     def _apply_shared(self):
-        self._merged_data = copy.deepcopy(self.data)
-        self._merged_secret_data = copy.deepcopy(self.secret_data)
-        apply_shared_value(self._merged_data)
-        apply_shared_value(self._merged_secret_data)
-        self._merged = merge_key_value(self._merged_data, self._merged_secret_data)
+        self._applied_data = copy.deepcopy(self.data)
+        self._applied_secret_data = copy.deepcopy(self.secret_data)
+        apply_shared_value(self._applied_data)
+        apply_shared_value(self._applied_secret_data)
+        self._merged = merge_key_value(self._applied_data, self._applied_secret_data)
 
     def __user_post_init__(self):
         """

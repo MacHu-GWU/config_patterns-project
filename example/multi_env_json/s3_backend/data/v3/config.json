@@ -1,0 +1,16 @@
+# content of config.json
+{
+    # this config file support comments, you can put documentation in the config file
+    "_shared": {
+        "*.project_name": "my_project"
+    },
+    "dev": {
+        "username": "dev.user.v3"
+    },
+    "int": {
+        "username": "int.user.v3"
+    },
+    "prod": {
+        "username": "prod.user.v3"
+    }
+}

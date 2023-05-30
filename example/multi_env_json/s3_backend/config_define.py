@@ -4,7 +4,7 @@
 import typing as T
 import dataclasses
 
-from config_patterns.patterns.multi_env_json import (
+from config_patterns.patterns.multi_env_json.api import (
     BaseEnvEnum,
     BaseEnv,
     BaseConfig,

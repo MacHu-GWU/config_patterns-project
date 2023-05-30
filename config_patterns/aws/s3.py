@@ -222,7 +222,6 @@ def deploy_config(
                 content_type="application/json",
                 tags=tags,
             )
-            print(s3path_res._meta)
             s3object = S3Object.from_put_object_response(s3path_res._meta)
             # basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
             # s3path_versioned = s3path_latest.change(new_basename=basename)
@@ -255,21 +254,6 @@ def deploy_config(
             )
             s3object = S3Object.from_put_object_response(s3path_res._meta)
 
-    #
-    # kwargs = dict(
-    #     Bucket=bucket,
-    #     Key=key,
-    #     Body=json.dumps(config_data, indent=4),
-    #     ContentType="application/json",
-    # )
-    # if tags:
-    #     tagging = "&".join([f"{key}={value}" for key, value in tags.items()])
-    #     kwargs["Tagging"] = tagging
-    # response = bsm.s3_client.put_object(**kwargs)
-    # logger.info("done!")
-    # s3object = S3Object.from_put_object_response(response)
-    # s3object.bucket = bucket
-    # s3object.key = key
     logger.info("done!")
     return s3object
 

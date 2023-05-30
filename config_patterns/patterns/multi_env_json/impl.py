@@ -21,6 +21,7 @@ try:
     from ...aws.ssm import deploy_parameter, delete_parameter
     from ...aws.s3 import (
         get_bucket_version_status,
+        read_config,
         deploy_config,
         delete_config,
         S3Object,
@@ -345,6 +346,8 @@ class BaseConfig:
     Env: T.Type[BaseEnv] = dataclasses.field()
     EnvEnum: T.Type[BaseEnvEnum] = dataclasses.field()
 
+    version: str = dataclasses.field()
+
     _applied_data: dict = dataclasses.field(init=False)
     _applied_secret_data: dict = dataclasses.field(init=False)
     _merged: dict = dataclasses.field(init=False)
@@ -467,14 +470,14 @@ class BaseConfig:
         bsm: T.Optional["boto_session_manager.BotoSesManager"] = None,
         parameter_name: T.Optional[str] = None,
         parameter_with_encryption: T.Optional[bool] = None,
-        s3path_config: T.Optional[str] = None,
+        s3folder_config: T.Optional[str] = None,
     ):
         """
         Create and initialize the config object from configuration store.
         Currently, it supports:
 
         1. read from local config files.
-        2. read from AWS Parameter Store.
+        2. read from AWS Parameter Store. You have to specify
         3. read from AWS S3.
 
         :param env_class: the per environment config dataclass object.
@@ -483,7 +486,7 @@ class BaseConfig:
         :param path_secret_config: local file path to the sensitive config file.
         :param parameter_name: the AWS Parameter name.
         :param parameter_with_encryption: is AWS Parameter turned on encryption?
-        :param s3path_config: the s3 uri to the config file.
+        :param s3folder_config: the s3 folder uri where you store the config file.
         :return:
         """
         if (path_config is not None) and (path_secret_config is not None):
@@ -494,6 +497,7 @@ class BaseConfig:
                 secret_data=secret_data,
                 Env=env_class,
                 EnvEnum=env_enum_class,
+                version="local",
             )
         elif (parameter_name is not None) and (
             parameter_with_encryption is not None
@@ -509,21 +513,22 @@ class BaseConfig:
                 secret_data=parameter_data["secret_data"],
                 Env=env_class,
                 EnvEnum=env_enum_class,
+                version=str(parameter.Version),
             )
-        elif s3path_config is not None:  # pragma: no cover
-            parts = s3path_config.split("/", 3)
-            bucket = parts[2]
-            key = parts[3]
-            config_data = json_loads(
-                bsm.s3_client.get_object(Bucket=bucket, Key=key)["Body"]
-                .read()
-                .decode("utf-8")
+        elif (parameter_name is not None) and (
+            s3folder_config is not None
+        ):  # pragma: no cover
+            config_data, config_version = read_config(
+                bsm=bsm,
+                s3folder_config=s3folder_config,
+                parameter_name=parameter_name,
             )
             return cls(
                 data=config_data["data"],
                 secret_data=config_data["secret_data"],
                 Env=env_class,
                 EnvEnum=env_enum_class,
+                version=config_version,
             )
         else:
             raise ValueError(
@@ -532,7 +537,8 @@ class BaseConfig:
                 "you want to read config from local config json file.\n"
                 "2. set both ``parameter_name`` and ``parameter_with_encryption`` "
                 "to indicate that you want to read from AWS Parameter Store.\n"
-                "3. set ``s3path_config`` similar to s3://my-bucket/my-project/dev.json "
+                "3. set both ``parameter_name`` similar to 'my-project-dev' "
+                "and ``s3folder_config`` similar to s3://my-bucket/my-project/ "
                 "to indicate that you want to read from AWS S3.\n"
             )
 

@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover
     pass
 
 from ..logger import logger
+from ..jsonutils import json_loads
 from ..vendor.better_enum import BetterStrEnum
 
 
@@ -115,6 +116,38 @@ def _show_deploy_info(s3path: S3Path):
     logger.info(f"preview at: {s3path.console_url}")
 
 
+def read_config(
+    bsm: "boto_session_manager.BotoSesManager",
+    s3folder_config: str,
+    parameter_name: str,
+) -> T.Tuple[dict, str]:
+    """
+    :return: config data and version
+    """
+    s3dir_config = S3Path(s3folder_config).to_dir()
+    s3_bucket_version_status = get_bucket_version_status(
+        bsm=bsm, bucket=s3dir_config.bucket
+    )
+    _ensure_bucket_versioning_is_not_suspended(
+        bucket=s3dir_config.bucket,
+        status=s3_bucket_version_status,
+    )
+    if s3_bucket_version_status.is_not_enabled():
+        s3path_latest = s3dir_config.joinpath(
+            parameter_name, f"{parameter_name}-latest.json"
+        )
+        config_data = json_loads(s3path_latest.read_text())
+        config_version = s3path_latest.metadata[KEY_CONFIG_VERSION]
+    elif s3_bucket_version_status.is_enabled():
+        s3path_latest = s3dir_config.joinpath(f"{parameter_name}.json")
+        config_data = json_loads(s3path_latest.read_text())
+        config_version = s3path_latest.version_id
+    else:  # pragma: no cover
+        raise NotImplementedError
+
+    return config_data, config_version
+
+
 @logger.start_and_end(
     msg="deploy config file to S3",
 )
@@ -160,7 +193,7 @@ def deploy_config(
 
     already_exists = s3path_latest.exists()
     if already_exists:
-        existing_config_data = json.loads(s3path_latest.read_text())
+        existing_config_data = json_loads(s3path_latest.read_text())
         if existing_config_data == config_data:
             logger.info("config data is the same as existing one, do nothing.")
             return None

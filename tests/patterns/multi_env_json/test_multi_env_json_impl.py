@@ -9,6 +9,7 @@ from pathlib import Path
 import moto
 from boto_session_manager import BotoSesManager
 from s3pathlib import S3Path, context
+from rich import print as rprint
 
 from config_patterns.compat import cached_property
 from config_patterns.aws.s3 import KEY_CONFIG_VERSION
@@ -314,6 +315,16 @@ class TestDeployment(BaseMockTest):
             "s3://my-bucket/my-project/my_project-prod/my_project-prod-latest.json",
         ]
 
+        logger.ruler("Read v1 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project",
+            s3folder_config=s3folder_config,
+        )
+        assert config.version == "1"
+
         logger.ruler("Second Deployment, should do nothing", char="*")
         config_v1.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
         assert len(s3dir_config.iter_objects().all()) == 6
@@ -329,11 +340,31 @@ class TestDeployment(BaseMockTest):
             if s3path.basename.endswith("latest.json"):
                 assert s3path.metadata[KEY_CONFIG_VERSION] == "2"
 
+        logger.ruler("Read v2 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project-dev",
+            s3folder_config=s3folder_config,
+        )
+        assert config.version == "2"
+
         logger.ruler("Delete latest version", char="*")
         config_v2.delete(bsm=self.bsm, s3folder_config=s3folder_config)
         s3path_list = s3dir_config.iter_objects().all()
         # only the *.latest.json should be deleted
         assert len(s3path_list) == 6
+
+        logger.ruler("Read v2 config object from S3 Deployment, this time should fail", char="*")
+        with pytest.raises(Exception):
+            Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project-dev",
+                s3folder_config=s3folder_config,
+            )
 
         # the *.latest.json should be deleted
         s3path_latest_json_list = [
@@ -351,6 +382,16 @@ class TestDeployment(BaseMockTest):
             # the *.latest.json should have the version in the metadata
             if s3path.basename.endswith("latest.json"):
                 assert s3path.metadata[KEY_CONFIG_VERSION] == "3"
+
+        logger.ruler("Read v3 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project-prod",
+            s3folder_config=s3folder_config,
+        )
+        assert config.version == "3"
 
         logger.ruler("Delete latest versions", char="*")
         config_v3.delete(bsm=self.bsm, s3folder_config=s3folder_config)
@@ -397,6 +438,16 @@ class TestDeployment(BaseMockTest):
         ]
         v1 = S3Path("s3://my-versioned-bucket/my-project/my_project.json").version_id
 
+        logger.ruler("Read v1 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project",
+            s3folder_config=s3folder_config,
+        )
+        assert config.version == v1
+
         logger.ruler("Second Deployment, should do nothing", char="*")
         config_v1.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
         s3path_list = s3dir_config.iter_objects().all()
@@ -416,7 +467,16 @@ class TestDeployment(BaseMockTest):
             assert len(s3path.list_object_versions().all()) == 2
         # v1 should be different from v2
         v2 = S3Path("s3://my-versioned-bucket/my-project/my_project.json").version_id
-        assert v1 != v2
+
+        logger.ruler("Read v2 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project",
+            s3folder_config=s3folder_config,
+        )
+        assert config.version == v2
 
         logger.ruler("Delete latest version", char="*")
         config_v2.delete(bsm=self.bsm, s3folder_config=s3folder_config)
@@ -427,6 +487,16 @@ class TestDeployment(BaseMockTest):
         # now it should have 3 version, v1, v2 and the delete marker
         assert len(S3Path("s3://my-versioned-bucket/my-project/my_project.json").list_object_versions().all()) == 3
 
+        logger.ruler("Read v2 config object from S3 Deployment, this time should fail", char="*")
+        with pytest.raises(Exception):
+            config = Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project",
+                s3folder_config=s3folder_config,
+            )
+
         logger.ruler("Fourth Deployment, should deploy v3", char="*")
         config_v3 = ConfigTestCase(version="v3").config
         config_v3.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
@@ -435,6 +505,17 @@ class TestDeployment(BaseMockTest):
 
         for s3path in s3path_list:
             assert len(s3path.list_object_versions().all()) == 4
+
+        logger.ruler("Read v3 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project",
+            s3folder_config=s3folder_config,
+        )
+        v3 = S3Path("s3://my-versioned-bucket/my-project/my_project.json").version_id
+        assert config.version == v3
 
         logger.ruler("Delete latest versions", char="*")
         config_v3.delete(bsm=self.bsm, s3folder_config=s3folder_config)
@@ -454,8 +535,8 @@ class TestDeployment(BaseMockTest):
     def test(self):
         print("")
         with logger.disabled(
-            disable=True,
-            # disable=False,
+            # disable=True,
+            disable=False,
         ):
             self._test_ssm_backend()
             self._test_s3_backend_version_not_enabled()

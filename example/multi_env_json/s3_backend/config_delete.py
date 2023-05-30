@@ -11,8 +11,8 @@ from rich import print as rprint
 
 # Read config from local file
 dir_here = Path(os.getcwd())
-path_config = str(dir_here.joinpath("config.json"))
-path_secret_config = str(dir_here.joinpath("secret_config.json"))
+path_config = str(dir_here.joinpath("data", "v1", "config.json"))
+path_secret_config = str(dir_here.joinpath("data", "v1", "config_secret.json"))
 
 
 config = Config.read(
@@ -21,21 +21,20 @@ config = Config.read(
     path_config=path_config,
     path_secret_config=path_secret_config,
 )
-rprint(config)
+# rprint(config)
 
 
 # Delete config from AWS Parameter Store
-bsm = BotoSesManager(profile_name="aws_data_lab_sanhe_us_east_1")
+bsm = BotoSesManager(profile_name="opensource")
+s3folder_config = f"s3://{bsm.aws_account_id}-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
 
 config.delete(
     bsm=bsm,
-    use_parameter_store=True,
+    s3folder_config=s3folder_config,
 )
 
-# Deploy config to AWS S3 Store
-s3dir_config = "s3://669508176277-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
-
 config.delete(
     bsm=bsm,
-    s3folder_config=s3dir_config,
+    s3folder_config=s3folder_config,
+    include_history=True,
 )

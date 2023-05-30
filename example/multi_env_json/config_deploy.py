@@ -27,16 +27,16 @@ config = Config.read(
 bsm = BotoSesManager(profile_name="opensource")
 
 # --- Deploy config to AWS Parameter Store
-config.delete(
-    bsm=bsm,
-    use_parameter_store=True,
-    verbose=True,
-)
-deployment_list = config.deploy(
-    bsm=bsm,
-    parameter_with_encryption=True,
-    verbose=True,
-)
+# config.delete(
+#     bsm=bsm,
+#     use_parameter_store=True,
+#     verbose=True,
+# )
+# deployment_list = config.deploy(
+#     bsm=bsm,
+#     parameter_with_encryption=True,
+#     verbose=True,
+# )
 # config = Config.read(
 #     env_class=Env,
 #     env_enum_class=EnvEnum,
@@ -49,15 +49,16 @@ deployment_list = config.deploy(
 # rprint(deployment_list)
 
 # --- Deploy config to AWS S3 Store
-s3dir_config = f"s3://{bsm.aws_account_id}-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
-# config.delete(
-#     bsm=bsm,
-#     s3dir_config=s3dir_config,
-#     verbose=False,
-# )
-# deployment_list = config.deploy(
-#     bsm=bsm,
-#     s3dir_config=s3dir_config,
-#     verbose=False,
-# )
+s3folder_config = f"s3://{bsm.aws_account_id}-us-east-1-artifacts/projects/config_pattern/patterns/multi_env_json/"
+print(config.parameter_name)
+config.delete(
+    bsm=bsm,
+    s3folder_config=s3folder_config,
+    verbose=False,
+)
+deployment_list = config.deploy(
+    bsm=bsm,
+    s3folder_config=s3folder_config,
+    verbose=True,
+)
 # rprint(deployment_list)

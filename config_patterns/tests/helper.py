@@ -24,7 +24,9 @@ def _run_cov_test(
     """
     args = [
         bin_pytest,
-        "-s", "--tb=native",
+        "-s",
+        # "--log-cli-level=INFO",
+        "--tb=native",
         f"--rootdir={root_dir}",
         f"--cov={module}",
         "--cov-report", "term-missing",

@@ -153,25 +153,10 @@ if __name__ == "__main__":
 
     EXTRA_REQUIRE = dict()
 
-    try:
-        EXTRA_REQUIRE["dev"] = read_requirements_file("requirements-dev.txt")
-    except:
-        print("'requirements-dev.txt' not found!")
-
-    try:
-        EXTRA_REQUIRE["test"] = read_requirements_file("requirements-test.txt")
-    except:
-        print("'requirements-test.txt' not found!")
-
-    try:
-        EXTRA_REQUIRE["doc"] = read_requirements_file("requirements-doc.txt")
-    except:
-        print("'requirements-doc.txt' not found!")
-
-    try:
-        EXTRA_REQUIRE["aws"] = read_requirements_file("requirements-aws.txt")
-    except:
-        print("'requirements-aws.txt' not found!")
+    EXTRA_REQUIRE["dev"] = read_requirements_file("requirements-dev.txt")
+    EXTRA_REQUIRE["test"] = read_requirements_file("requirements-test.txt")
+    EXTRA_REQUIRE["doc"] = read_requirements_file("requirements-doc.txt")
+    EXTRA_REQUIRE["aws"] = read_requirements_file("requirements-aws.txt")
 
     setup(
         name=PKG_NAME,
@@ -242,9 +227,6 @@ Frequent used classifiers List::
         "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 2 :: Only",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

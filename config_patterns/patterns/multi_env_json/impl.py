@@ -2,7 +2,6 @@
 
 import typing as T
 import copy
-import enum
 import string
 import dataclasses
 from pathlib import Path
@@ -17,9 +16,15 @@ except ImportError:  # pragma: no cover
 try:
     import pysecret
     import aws_console_url
+    from s3pathlib import S3Path
 
     from ...aws.ssm import deploy_parameter, delete_parameter
-    from ...aws.s3 import deploy_config, delete_config, S3Object
+    from ...aws.s3 import (
+        get_bucket_version_status,
+        deploy_config,
+        delete_config,
+        S3Object,
+    )
 except ImportError:  # pragma: no cover
     pass
 
@@ -238,7 +243,7 @@ class ConfigDeployment:
     def deploy_to_s3(
         self,
         bsm: "boto_session_manager.BotoSesManager",
-        s3dir_config: str,
+        s3folder_config: str,
         tags: T.Optional[T.Dict[str, str]] = None,
         verbose: bool = True,
     ):
@@ -250,12 +255,14 @@ class ConfigDeployment:
                 ProjectName=self.project_name,
                 EnvName=self.env_name,
             )
+
         with logger.disabled(
             disable=not verbose,
         ):
             self.deployment = deploy_config(
                 bsm=bsm,
-                s3path_config=f"{s3dir_config}{self.parameter_name_for_arn}.json",
+                s3folder_config=S3Path(s3folder_config).to_dir().uri,
+                parameter_name=self.parameter_name_for_arn,
                 config_data=self.parameter_data,
                 tags=tags,
             )
@@ -281,7 +288,8 @@ class ConfigDeployment:
     def delete_from_s3(
         self,
         bsm: "boto_session_manager.BotoSesManager",
-        s3dir_config: str,
+        s3folder_config: str,
+        include_history: bool = False,
         verbose: bool = True,
     ):
         """
@@ -290,10 +298,11 @@ class ConfigDeployment:
         with logger.disabled(
             disable=not verbose,
         ):
-            s3_uri = f"{s3dir_config}{self.parameter_name_for_arn}.json"
             self.deletion = delete_config(
                 bsm=bsm,
-                s3path_config=s3_uri,
+                s3folder_config=S3Path(s3folder_config).to_dir().uri,
+                parameter_name=self.parameter_name_for_arn,
+                include_history=include_history,
             )
             return self.deletion
 
@@ -587,7 +596,7 @@ class BaseConfig:
         self,
         bsm: "boto_session_manager.BotoSesManager",
         parameter_with_encryption: T.Optional[bool] = None,
-        s3dir_config: T.Optional[str] = None,
+        s3folder_config: T.Optional[str] = None,
         tags: T.Optional[T.Dict[str, str]] = None,
         verbose: bool = True,
     ) -> T.List[ConfigDeployment]:
@@ -604,7 +613,7 @@ class BaseConfig:
 
         :param bsm:
         :param parameter_with_encryption:
-        :param s3dir_config:
+        :param s3folder_config:
         :param tags:
         :param verbose:
 
@@ -626,12 +635,12 @@ class BaseConfig:
                     verbose=verbose,
                 )
             return deployment_list
-        elif s3dir_config is not None:
+        elif s3folder_config is not None:
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
                 deployment.deploy_to_s3(
                     bsm=bsm,
-                    s3dir_config=s3dir_config,
+                    s3folder_config=s3folder_config,
                     tags=tags,
                     verbose=verbose,
                 )
@@ -641,7 +650,7 @@ class BaseConfig:
                 "The arguments has to meet one of these criteria:\n"
                 "1. set ``parameter_with_encryption`` to True or False to indicate that "
                 "you want to deploy to AWS Parameter Store.\n"
-                "2. set ``s3dir_config`` similar to s3://my-bucket/my-project/ "
+                "2. set ``s3folder_config`` similar to s3://my-bucket/my-project/ "
                 "to indicate that you want to deploy to S3."
             )
 
@@ -649,7 +658,8 @@ class BaseConfig:
         self,
         bsm: "boto_session_manager.BotoSesManager",
         use_parameter_store: T.Optional[bool] = None,
-        s3dir_config: T.Optional[str] = None,
+        s3folder_config: T.Optional[str] = None,
+        include_history: bool = False,
         verbose: bool = True,
     ):
         """
@@ -662,7 +672,7 @@ class BaseConfig:
 
         :param bsm:
         :param use_parameter_store:
-        :param s3dir_config:
+        :param s3folder_config:
         :param verbose:
 
         :return: a list of :class:`ConfigDeployment`.
@@ -679,12 +689,13 @@ class BaseConfig:
                     verbose=verbose,
                 )
             return deployment_list
-        elif (bsm is not None) and (s3dir_config is not None):
+        elif (bsm is not None) and (s3folder_config is not None):
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
                 deployment.delete_from_s3(
                     bsm=bsm,
-                    s3dir_config=s3dir_config,
+                    s3folder_config=s3folder_config,
+                    include_history=include_history,
                     verbose=verbose,
                 )
             return deployment_list
@@ -693,6 +704,6 @@ class BaseConfig:
                 "The arguments has to meet one of these criteria:\n"
                 "1. set ``use_parameter_store`` to True to indicate that "
                 "you want to delete config from AWS Parameter Store.\n"
-                "2. set ``s3dir_config`` similar to s3://my-bucket/my-project/ "
+                "2. set ``s3folder_config`` similar to s3://my-bucket/my-project/ "
                 "to indicate that you want to delete config file from S3."
             )

@@ -1,0 +1,66 @@
+{
+    "_shared": {
+        "*.project_name": "my_project",
+        "*.tags.project_name": "my_project_v1",
+        "dev.databases.port": 3306,
+        "prod.databases.port": 5432,
+        "*.servers.*.domain": "www.example.com",
+        "*.servers.*.cpu": 1
+    },
+    "dev": {
+        "username": "dev.user",
+        "databases": [
+            {
+                "host": "www.db1.com"
+            }
+        ],
+        "servers": {
+            "_shared": {
+                "*.cpu": 2
+            },
+            "blue": {
+                "ip": "111.111.111.111",
+                "domain": "www.blue.com",
+                "memory": 4
+            },
+            "green": {
+                "ip": "111.111.111.111",
+                "cpu": 4,
+                "memory": 4
+            }
+        },
+        "tags": {
+            "env_name": "dev"
+        }
+    },
+    "prod": {
+        "username": "prod.user",
+        "databases": [
+            {
+                "host": "www.db2.com"
+            },
+            {
+                "host": "www.db3.com",
+                "port": 2345
+            }
+        ],
+        "servers": {
+            "_shared": {
+                "*.domain": "www.prod.com"
+            },
+            "black": {
+                "ip": "111.111.111.111",
+                "domain": "www.black.com",
+                "memory": 16
+            },
+            "white": {
+                "ip": "111.111.111.111",
+                "cpu": 8,
+                "memory": 16
+            }
+        },
+        "tags": {
+            "env_name": "prod"
+        }
+    }
+}

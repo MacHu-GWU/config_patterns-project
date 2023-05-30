@@ -1,0 +1,67 @@
+{
+    "dev": {
+        "username": "dev.user",
+        "databases": [
+            {
+                "host": "www.db1.com",
+                "port": 3306,
+                "password": "dev.db1.pwd"
+            }
+        ],
+        "servers": {
+            "blue": {
+                "ip": "111.111.111.111",
+                "cpu": 2,
+                "memory": 4,
+                "domain": "www.blue.com"
+            },
+            "green": {
+                "ip": "111.111.111.111",
+                "cpu": 4,
+                "memory": 4,
+                "domain": "www.example.com"
+            }
+        },
+        "tags": {
+            "env_name": "dev",
+            "project_name": "my_project_v1"
+        },
+        "project_name": "my_project",
+        "password": "dev.password"
+    },
+    "prod": {
+        "username": "prod.user",
+        "databases": [
+            {
+                "host": "www.db2.com",
+                "port": 5432,
+                "password": "prod.db2.pwd"
+            },
+            {
+                "host": "www.db3.com",
+                "port": 2345,
+                "password": "prod.db3.pwd"
+            }
+        ],
+        "servers": {
+            "black": {
+                "ip": "111.111.111.111",
+                "cpu": 1,
+                "memory": 16,
+                "domain": "www.black.com"
+            },
+            "white": {
+                "ip": "111.111.111.111",
+                "cpu": 8,
+                "memory": 16,
+                "domain": "www.prod.com"
+            }
+        },
+        "tags": {
+            "env_name": "prod",
+            "project_name": "my_project_v1"
+        },
+        "project_name": "my_project",
+        "password": "prod.password"
+    }
+}

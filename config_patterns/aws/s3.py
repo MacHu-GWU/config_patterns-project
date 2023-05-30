@@ -110,6 +110,11 @@ class S3Object:
         )
 
 
+def _show_deploy_info(s3path: S3Path):
+    logger.info(f"🚀️ deploy config file/files at {s3path.uri} ...")
+    logger.info(f"preview at: {s3path.console_url}")
+
+
 @logger.start_and_end(
     msg="deploy config file to S3",
 )
@@ -180,18 +185,72 @@ def deploy_config(
             )
             s3object = S3Object.from_put_object_response(s3path_res._meta)
         else:
+            versions: T.List[int] = list()
+            for s3path in s3path_latest.parent.iter_objects():
+                try:
+                    versions.append(int(s3path.fname.split("-")[-1]))
+                except:
+                    pass
+            if len(versions):
+                latest_version = max(versions)
+            else:
+                latest_version = 0
+            new_version = latest_version + 1
+
             s3path_latest.write_text(
                 json.dumps(config_data, indent=4),
                 content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: "1"},
+                metadata={KEY_CONFIG_VERSION: str(new_version)},
                 tags=tags,
             )
-            basename = f"{parameter_name}-{str(1).zfill(ZFILL)}.json"
+            basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
             s3path_versioned = s3path_latest.change(new_basename=basename)
             s3path_res = s3path_versioned.write_text(
                 json.dumps(config_data, indent=4),
                 content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: "1"},
+                metadata={KEY_CONFIG_VERSION: str(new_version)},
+                tags=tags,
+            )
+            s3object = S3Object.from_put_object_response(s3path_res._meta)
+
+    else:
+        if already_exists:
+            # latest_version = int(s3path_latest.metadata[KEY_CONFIG_VERSION])
+            # new_version = latest_version + 1
+            s3path_res = s3path_latest.write_text(
+                json.dumps(config_data, indent=4),
+                content_type="application/json",
+                tags=tags,
+            )
+            print(s3path_res._meta)
+            s3object = S3Object.from_put_object_response(s3path_res._meta)
+            # basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
+            # s3path_versioned = s3path_latest.change(new_basename=basename)
+            # s3path_res = s3path_versioned.write_text(
+            #     json.dumps(config_data, indent=4),
+            #     content_type="application/json",
+            #     metadata={KEY_CONFIG_VERSION: str(new_version)},
+            #     tags=tags,
+            # )
+            # s3object = S3Object.from_put_object_response(s3path_res._meta)
+            pass
+        else:
+            # versions: T.List[int] = list()
+            # for s3path in s3path_latest.parent.iter_objects():
+            #     try:
+            #         versions.append(int(s3path.fname.split("-")[-1]))
+            #     except:
+            #         pass
+            # if len(versions):
+            #     latest_version = max(versions)
+            # else:
+            #     latest_version = 0
+            # latest_version = 0
+            # new_version = latest_version + 1
+
+            s3path_res = s3path_latest.write_text(
+                json.dumps(config_data, indent=4),
+                content_type="application/json",
                 tags=tags,
             )
             s3object = S3Object.from_put_object_response(s3path_res._meta)

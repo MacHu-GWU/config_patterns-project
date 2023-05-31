@@ -16,24 +16,36 @@ import typing as T
 import json
 import dataclasses
 
-try:
-    import boto3
-    import boto_session_manager
-    import aws_console_url
-    from s3pathlib import S3Path
-except ImportError:  # pragma: no cover
-    pass
+from boto_session_manager import BotoSesManager
+from func_args import NOTHING
+from s3pathlib import S3Path
 
+from .. import exc
 from ..logger import logger
 from ..jsonutils import json_loads
+from ..compat import cached_property
+from ..utils import sha256_of_text
 from ..vendor.better_enum import BetterStrEnum
 
 
 ZFILL = 6
 KEY_CONFIG_VERSION = "config_version"
+KEY_CONFIG_SHA256 = "config_sha256"
 
 
+# ------------------------------------------------------------------------------
+# S3 bucket version status
+# ------------------------------------------------------------------------------
 class S3BucketVersionStatus(BetterStrEnum):
+    """
+    Enumerate the status of S3 bucket versioning.
+
+    - NotEnabled: bucket doesn't turn on versioning.
+    - Enabled: bucket turns on versioning.
+    - Suspended: bucket turns on versioning but is suspended. We don't store
+        config files in a bucket with 'suspended' status.
+    """
+
     NotEnabled = "NotEnabled"
     Enabled = "Enabled"
     Suspended = "Suspended"
@@ -49,11 +61,14 @@ class S3BucketVersionStatus(BetterStrEnum):
 
 
 def get_bucket_version_status(
-    bsm: "boto_session_manager.BotoSesManager",
+    bsm: BotoSesManager,
     bucket: str,
 ) -> S3BucketVersionStatus:
     """
-    Check if the S3 bucket turns on versioning.
+    Get the version status of a S3 bucket.
+
+    :param bsm: the ``boto_session_manager.BotoSesManager`` object.
+    :param bucket: the bucket name.
     """
     res = bsm.s3_client.get_bucket_versioning(Bucket=bucket)
     status = res.get("Status", S3BucketVersionStatus.NotEnabled.value)
@@ -65,8 +80,12 @@ def _ensure_bucket_versioning_is_not_suspended(
     bucket: str,
     status: S3BucketVersionStatus,
 ):
+    """
+    We don't store config files in a bucket with 'suspended' status. We could
+    use this function to ensure the bucket versioning is not suspended.
+    """
     if status.is_suspended():
-        raise ValueError(
+        raise exc.S3BucketVersionSuspendedError(
             f"bucket {bucket!r} versioning is suspended. "
             f"I don't know how to handle this situation."
         )
@@ -74,6 +93,10 @@ def _ensure_bucket_versioning_is_not_suspended(
 
 @dataclasses.dataclass
 class S3Object:
+    """
+    This class represents an S3 object.
+    """
+
     bucket: T.Optional[str] = dataclasses.field(default=None)
     key: T.Optional[str] = dataclasses.field(default=None)
     expiration: T.Optional[str] = dataclasses.field(default=None)
@@ -93,6 +116,9 @@ class S3Object:
 
     @classmethod
     def from_put_object_response(cls, response: dict) -> "S3Object":
+        """
+        Create an ``S3Object`` object from the response of s3_client.put_object(...).
+        """
         return cls(
             expiration=response.get("Expiration"),
             etag=response.get("ETag"),
@@ -111,182 +137,259 @@ class S3Object:
         )
 
 
+@dataclasses.dataclass
+class S3Parameter:
+    """
+    This class represents a S3 parameter. It is actually a file in a S3 bucket.
+    The S3 bucket could have version enabled or not enabled.
+
+    :param s3dir_config: the S3 directory where the parameter is stored.
+        it should not include any file name information.
+    :param parameter_name: the parameter name that will be used as the file name.
+    :param version_status: the :class:`S3BucketVersionStatus` enum object.
+    :param version_enabled: whether the S3 bucket versioning is enabled.
+    :param s3path_latest: the S3 path of the file representing the latest version
+        of the parameter.
+
+    When deploying a new version of parameter, for versioning disabled bucket,
+    it should deploy two S3 objects:
+
+    - ``${s3folder_config}/${parameter_name}/${parameter_name}-latest.json``
+    - ``${s3folder_config}/${parameter_name}/${parameter_name}-${1, 2, 3, ...}.json``,
+
+    For versioning enabled bucket, it should deploy only one S3 object, it creates
+    a new version of the object:
+
+    - ``${s3folder_config}/${parameter_name}.json``
+
+    .. seealso::
+
+        - :meth:`~S3Parameter.deploy_latest_when_version_not_enabled`
+        - :meth:`~S3Parameter.deploy_latest_when_version_is_enabled`
+    """
+
+    s3dir_config: S3Path = dataclasses.field()
+    parameter_name: str = dataclasses.field()
+    version_status: S3BucketVersionStatus = dataclasses.field()
+    version_enabled: bool = dataclasses.field()
+    s3path_latest: S3Path = dataclasses.field()
+
+    @classmethod
+    def new(
+        cls,
+        bsm: BotoSesManager,
+        s3folder_config: str,
+        parameter_name: str,
+    ) -> "S3Parameter":
+        s3dir_config = S3Path(s3folder_config).to_dir()
+        s3_bucket_version_status = get_bucket_version_status(
+            bsm=bsm,
+            bucket=s3dir_config.bucket,
+        )
+        _ensure_bucket_versioning_is_not_suspended(
+            bucket=s3dir_config.bucket,
+            status=s3_bucket_version_status,
+        )
+        if s3_bucket_version_status.is_enabled():
+            s3path_latest = s3dir_config.joinpath(f"{parameter_name}.json")
+        else:
+            s3path_latest = s3dir_config.joinpath(
+                parameter_name,
+                f"{parameter_name}-latest.json",
+            )
+        return cls(
+            s3dir_config=s3dir_config,
+            parameter_name=parameter_name,
+            version_status=s3_bucket_version_status,
+            version_enabled=s3_bucket_version_status.is_enabled(),
+            s3path_latest=s3path_latest,
+        )
+
+    def read_latest(self, bsm: BotoSesManager) -> T.Tuple[dict, str]:
+        """
+        Read the latest config data and config version from S3.
+
+        For versioning disabled bucket, the version is 1, 2, 3, ...
+        For versioning enabled bucket, the version is the version id of the S3 object.
+        """
+        config_data = json_loads(self.s3path_latest.read_text(bsm=bsm))
+        if self.version_enabled:
+            config_version = self.s3path_latest.version_id
+        else:
+            config_version = self.s3path_latest.metadata[KEY_CONFIG_VERSION]
+        return config_data, config_version
+
+    def get_latest_config_version_when_version_not_enabled(
+        self,
+        bsm: BotoSesManager,
+    ) -> T.Optional[int]:
+        """
+        Todo: add docstring
+        """
+        if self.s3path_latest.exists(bsm=bsm):
+            return int(self.s3path_latest.metadata[KEY_CONFIG_VERSION])
+        else:
+            versions: T.List[int] = list()
+            for s3path in self.s3path_latest.parent.iter_objects():
+                try:
+                    versions.append(int(s3path.fname.split("-")[-1]))
+                except:
+                    pass
+            if len(versions):
+                return max(versions)
+            else:
+                return None
+
+    def get_latest_config_version_when_version_is_enabled(
+        self,
+        bsm: BotoSesManager,
+    ) -> T.Optional[str]:
+        """
+        Todo: add docstring
+        """
+        s3path_list = self.s3path_latest.list_object_versions(limit=2, bsm=bsm).all()
+        if len(s3path_list) == 0:
+            return None
+        else:
+            if s3path_list[0].is_delete_marker():
+                return s3path_list[1].version_id
+            else:
+                return s3path_list[0].version_id
+
+    def deploy_latest_when_version_not_enabled(
+        self,
+        bsm: BotoSesManager,
+        config_data: dict,
+        config_version: str,
+        tags: T.Optional[T.Dict[str, str]] = NOTHING,
+    ) -> S3Object:
+        """
+        Todo: add docstring
+        """
+        basename = f"{self.parameter_name}-{config_version.zfill(ZFILL)}.json"
+        s3path_versioned = self.s3path_latest.change(new_basename=basename)
+        content = json.dumps(config_data, indent=4)
+        config_sha256 = sha256_of_text(content)
+        s3path_res = s3path_versioned.write_text(
+            content,
+            content_type="application/json",
+            metadata={
+                KEY_CONFIG_VERSION: config_version,
+                KEY_CONFIG_SHA256: config_sha256,
+            },
+            tags=tags,
+            bsm=bsm,
+        )
+        s3object = S3Object.from_put_object_response(s3path_res._meta)
+
+        s3path_versioned.copy_to(self.s3path_latest, overwrite=True, bsm=bsm)
+        return s3object
+
+    def deploy_latest_when_version_is_enabled(
+        self,
+        bsm: BotoSesManager,
+        config_data: dict,
+        tags: T.Optional[T.Dict[str, str]] = NOTHING,
+    ) -> S3Object:
+        """
+        Todo: add docstring
+        """
+        content = json.dumps(config_data, indent=4)
+        config_sha256 = sha256_of_text(content)
+        s3path_res = self.s3path_latest.write_text(
+            content,
+            content_type="application/json",
+            metadata={
+                KEY_CONFIG_SHA256: config_sha256,
+            },
+            tags=tags,
+            bsm=bsm,
+        )
+        s3object = S3Object.from_put_object_response(s3path_res._meta)
+        return s3object
+
+
 def _show_deploy_info(s3path: S3Path):
     logger.info(f"🚀️ deploy config file/files at {s3path.uri} ...")
     logger.info(f"preview at: {s3path.console_url}")
 
 
 def read_config(
-    bsm: "boto_session_manager.BotoSesManager",
+    bsm: BotoSesManager,
     s3folder_config: str,
     parameter_name: str,
 ) -> T.Tuple[dict, str]:
     """
+    Read config data and config version from S3.
+
     :return: config data and version
     """
-    s3dir_config = S3Path(s3folder_config).to_dir()
-    s3_bucket_version_status = get_bucket_version_status(
-        bsm=bsm, bucket=s3dir_config.bucket
+    s3parameter = S3Parameter.new(
+        bsm=bsm,
+        s3folder_config=s3folder_config,
+        parameter_name=parameter_name,
     )
-    _ensure_bucket_versioning_is_not_suspended(
-        bucket=s3dir_config.bucket,
-        status=s3_bucket_version_status,
-    )
-    if s3_bucket_version_status.is_not_enabled():
-        s3path_latest = s3dir_config.joinpath(
-            parameter_name, f"{parameter_name}-latest.json"
-        )
-        config_data = json_loads(s3path_latest.read_text())
-        config_version = s3path_latest.metadata[KEY_CONFIG_VERSION]
-    elif s3_bucket_version_status.is_enabled():
-        s3path_latest = s3dir_config.joinpath(f"{parameter_name}.json")
-        config_data = json_loads(s3path_latest.read_text())
-        config_version = s3path_latest.version_id
-    else:  # pragma: no cover
-        raise NotImplementedError
-
-    return config_data, config_version
+    return s3parameter.read_latest(bsm=bsm)
 
 
 @logger.start_and_end(
     msg="deploy config file to S3",
 )
 def deploy_config(
-    bsm: "boto_session_manager.BotoSesManager",
+    bsm: BotoSesManager,
     s3folder_config: str,
     parameter_name: str,
     config_data: dict,
-    tags: T.Optional[dict] = None,
+    tags: T.Optional[dict] = NOTHING,
 ) -> T.Optional[S3Object]:
     """
     Deploy config to AWS S3
 
     :param bsm: the ``boto_session_manager.BotoSesManager`` object.
-    :param s3folder_config: s3 directory uri for this config json file.
-    :param parameter_name: the parameter name for this config.
+    :param s3dir_config: the S3 directory where the parameter is stored.
+        it should not include any file name information.
+    :param parameter_name: the parameter name that will be used as the file name.
     :param config_data: config data.
-    :param version_enabled: whether to enable versioning for this config file.
     :param tags: optional key value tags.
 
     :return: a :class:`S3Object` to indicate the deployed config file on S3.
         if returns None, then no deployment happened.
     """
-    s3dir_config = S3Path(s3folder_config).to_dir()
-    s3_bucket_version_status = get_bucket_version_status(
-        bsm=bsm, bucket=s3dir_config.bucket
+    s3parameter = S3Parameter.new(
+        bsm=bsm,
+        s3folder_config=s3folder_config,
+        parameter_name=parameter_name,
     )
-    _ensure_bucket_versioning_is_not_suspended(
-        bucket=s3dir_config.bucket,
-        status=s3_bucket_version_status,
-    )
-    if s3_bucket_version_status.is_not_enabled():
-        s3path_latest = s3dir_config.joinpath(
-            parameter_name, f"{parameter_name}-latest.json"
-        )
-    elif s3_bucket_version_status.is_enabled():
-        s3path_latest = s3dir_config.joinpath(f"{parameter_name}.json")
-    else:  # pragma: no cover
-        raise NotImplementedError
+    s3path_latest = s3parameter.s3path_latest
+    _show_deploy_info(s3path=s3path_latest)
 
-    logger.info(f"🚀️ deploy config file {s3path_latest.uri} ...")
-    logger.info(f"preview at: {s3path_latest.console_url}")
-
-    already_exists = s3path_latest.exists()
+    already_exists = s3path_latest.exists(bsm=bsm)
     if already_exists:
-        existing_config_data = json_loads(s3path_latest.read_text())
+        existing_config_data, _ = s3parameter.read_latest(bsm=bsm)
         if existing_config_data == config_data:
             logger.info("config data is the same as existing one, do nothing.")
             return None
 
-    if s3_bucket_version_status.is_not_enabled():
-        if already_exists:
-            latest_version = int(s3path_latest.metadata[KEY_CONFIG_VERSION])
-            new_version = latest_version + 1
-            s3path_latest.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: str(new_version)},
-                tags=tags,
-            )
-            basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
-            s3path_versioned = s3path_latest.change(new_basename=basename)
-            s3path_res = s3path_versioned.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: str(new_version)},
-                tags=tags,
-            )
-            s3object = S3Object.from_put_object_response(s3path_res._meta)
+    if s3parameter.version_enabled is False:
+        latest_version = s3parameter.get_latest_config_version_when_version_not_enabled(
+            bsm=bsm,
+        )
+        if latest_version is None:
+            new_version = 1
         else:
-            versions: T.List[int] = list()
-            for s3path in s3path_latest.parent.iter_objects():
-                try:
-                    versions.append(int(s3path.fname.split("-")[-1]))
-                except:
-                    pass
-            if len(versions):
-                latest_version = max(versions)
-            else:
-                latest_version = 0
             new_version = latest_version + 1
-
-            s3path_latest.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: str(new_version)},
-                tags=tags,
-            )
-            basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
-            s3path_versioned = s3path_latest.change(new_basename=basename)
-            s3path_res = s3path_versioned.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                metadata={KEY_CONFIG_VERSION: str(new_version)},
-                tags=tags,
-            )
-            s3object = S3Object.from_put_object_response(s3path_res._meta)
-
+        s3object = s3parameter.deploy_latest_when_version_not_enabled(
+            bsm=bsm,
+            config_data=config_data,
+            config_version=str(new_version),
+            tags=tags,
+        )
     else:
-        if already_exists:
-            # latest_version = int(s3path_latest.metadata[KEY_CONFIG_VERSION])
-            # new_version = latest_version + 1
-            s3path_res = s3path_latest.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                tags=tags,
-            )
-            s3object = S3Object.from_put_object_response(s3path_res._meta)
-            # basename = f"{parameter_name}-{str(new_version).zfill(ZFILL)}.json"
-            # s3path_versioned = s3path_latest.change(new_basename=basename)
-            # s3path_res = s3path_versioned.write_text(
-            #     json.dumps(config_data, indent=4),
-            #     content_type="application/json",
-            #     metadata={KEY_CONFIG_VERSION: str(new_version)},
-            #     tags=tags,
-            # )
-            # s3object = S3Object.from_put_object_response(s3path_res._meta)
-            pass
-        else:
-            # versions: T.List[int] = list()
-            # for s3path in s3path_latest.parent.iter_objects():
-            #     try:
-            #         versions.append(int(s3path.fname.split("-")[-1]))
-            #     except:
-            #         pass
-            # if len(versions):
-            #     latest_version = max(versions)
-            # else:
-            #     latest_version = 0
-            # latest_version = 0
-            # new_version = latest_version + 1
-
-            s3path_res = s3path_latest.write_text(
-                json.dumps(config_data, indent=4),
-                content_type="application/json",
-                tags=tags,
-            )
-            s3object = S3Object.from_put_object_response(s3path_res._meta)
-
+        s3object = s3parameter.deploy_latest_when_version_is_enabled(
+            bsm=bsm,
+            config_data=config_data,
+            tags=tags,
+        )
     logger.info("done!")
     return s3object
 
@@ -300,7 +403,7 @@ def _show_delete_info(s3path: S3Path):
     msg="delete config file from S3",
 )
 def delete_config(
-    bsm: "boto_session_manager.BotoSesManager",
+    bsm: BotoSesManager,
     s3folder_config: str,
     parameter_name: str,
     include_history: bool = False,
@@ -310,21 +413,27 @@ def delete_config(
 
     For versioning disabled bucket:
 
-    - ``${include_history} = False``: ``${s3folder_config}/${parameter_name}/${parameter_name}-latest.json``
-    - ``${include_history} = True``: ``${s3folder_config}/${parameter_name}/${parameter_name}-latest.json``
-        and ``${s3folder_config}/${parameter_name}/${parameter_name}-1.json``,
-        ``${s3folder_config}/${parameter_name}/${parameter_name}-2.json``,
-        ``${s3folder_config}/${parameter_name}/${parameter_name}-3.json``, ...
+    - ``${include_history} = False``:
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}-latest.json``
+    - ``${include_history} = True``:
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}-latest.json``
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}-1.json``
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}-2.json``
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}-3.json``
+        - ...
 
     For versioning enabled bucket:
 
-    - ``${include_history} = False``: ``${s3folder_config}/${parameter_name}.json``
-        only put delete marker on the latest version.
-    - ``${include_history} = True``: ``${s3folder_config}/${parameter_name}/${parameter_name}.json``
-        delete all historical versions permanently.
+    - ``${include_history} = False``:
+        - ``${s3folder_config}/${parameter_name}.json``, only put delete marker
+            on the latest version.
+    - ``${include_history} = True``:
+        - ``${s3folder_config}/${parameter_name}/${parameter_name}.json`` delete
+            all historical versions permanently.
 
-    :param s3folder_config: s3 directory uri for this config json file.
-    :param parameter_name: the parameter name for this config.
+    :param s3dir_config: the S3 directory where the parameter is stored.
+        it should not include any file name information.
+    :param parameter_name: the parameter name that will be used as the file name.
     :param include_history: whether to delete all historical versions permanently.
 
     Ref:
@@ -333,30 +442,21 @@ def delete_config(
 
     :return: a boolean value indicating whether a deletion happened.
     """
-    s3dir_config = S3Path(s3folder_config).to_dir()
-    s3_bucket_version_status = get_bucket_version_status(
-        bsm=bsm, bucket=s3dir_config.bucket
+    s3parameter = S3Parameter.new(
+        bsm=bsm,
+        s3folder_config=s3folder_config,
+        parameter_name=parameter_name,
     )
-    _ensure_bucket_versioning_is_not_suspended(
-        bucket=s3dir_config.bucket, status=s3_bucket_version_status
-    )
-    if s3_bucket_version_status.is_not_enabled():
-        s3path_latest = s3dir_config.joinpath(
-            parameter_name,
-            f"{parameter_name}-latest.json",
-        )
+    s3path_latest = s3parameter.s3path_latest
+    if s3parameter.version_enabled is False:
         if include_history:
             _show_delete_info(s3path_latest.parent)
             s3path_latest.parent.delete()
         else:
             _show_delete_info(s3path_latest)
             s3path_latest.delete()
-    elif s3_bucket_version_status.is_enabled():
-        s3path_latest = s3dir_config.joinpath(f"{parameter_name}.json")
+    else:
         _show_delete_info(s3path_latest)
         s3path_latest.delete(is_hard_delete=include_history)
-    else:  # pragma: no cover
-        raise NotImplementedError
-
     logger.info("done!")
     return True

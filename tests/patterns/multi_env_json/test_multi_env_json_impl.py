@@ -9,7 +9,6 @@ from pathlib import Path
 import moto
 from boto_session_manager import BotoSesManager
 from s3pathlib import S3Path, context
-from rich import print as rprint
 
 from config_patterns.compat import cached_property
 from config_patterns.aws.s3 import KEY_CONFIG_VERSION

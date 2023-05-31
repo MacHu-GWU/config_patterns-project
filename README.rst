@@ -52,6 +52,7 @@ Welcome to ``config_patterns`` Documentation
 ==============================================================================
 ``config_patterns`` is a Python library that simplify your config management for production-ready application.
 
+1.
 1. `Multi Environment Json <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/multi_env_json/example.ipynb>`_: allows you to manage configs for multi-environment deployment application, use AWS Parameter Store or AWS S3 as the backend.
 
 

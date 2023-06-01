@@ -23,8 +23,7 @@ from s3pathlib import S3Path
 from .. import exc
 from ..logger import logger
 from ..jsonutils import json_loads
-from ..compat import cached_property
-from ..utils import sha256_of_text
+from ..utils import sha256_of_config_data
 from ..vendor.better_enum import BetterStrEnum
 
 
@@ -269,7 +268,7 @@ class S3Parameter:
         basename = f"{self.parameter_name}-{config_version.zfill(ZFILL)}.json"
         s3path_versioned = self.s3path_latest.change(new_basename=basename)
         content = json.dumps(config_data, indent=4)
-        config_sha256 = sha256_of_text(content)
+        config_sha256 = sha256_of_config_data(config_data)
         s3path_res = s3path_versioned.write_text(
             content,
             content_type="application/json",
@@ -295,7 +294,7 @@ class S3Parameter:
         Todo: add docstring
         """
         content = json.dumps(config_data, indent=4)
-        config_sha256 = sha256_of_text(content)
+        config_sha256 = sha256_of_config_data(config_data)
         s3path_res = self.s3path_latest.write_text(
             content,
             content_type="application/json",
@@ -457,6 +456,6 @@ def delete_config(
             s3path_latest.delete(bsm=bsm)
     else:
         _show_delete_info(s3path_latest)
-        s3path_latest.delete(is_hard_delete=include_history)
+        s3path_latest.delete(bsm=bsm, is_hard_delete=include_history)
     logger.info("done!")
     return True

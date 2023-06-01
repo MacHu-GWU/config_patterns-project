@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover
 from ...logger import logger
 from ...jsonutils import json_loads
 from ...compat import cached_property
+from ...utils import sha256_of_config_data
 from ...vendor.strutils import slugify
 from ...vendor.better_enum import BetterStrEnum
 from ..hierarchy import apply_shared_value
@@ -225,10 +226,16 @@ class ConfigDeployment:
         Deploy config to AWS SSM Parameter Store.
         """
         if tags is None:
-            tags = dict(
-                ProjectName=self.project_name,
-                EnvName=self.env_name,
-            )
+            tags = {}
+
+        tags.update(
+            {
+                "config_pattern:project_name": self.project_name,
+                "config_pattern:env_name": self.env_name,
+                "config_pattern:config_sha256": sha256_of_config_data(self.parameter_data)
+            }
+        )
+
         with logger.disabled(
             disable=not verbose,
         ):
@@ -252,10 +259,14 @@ class ConfigDeployment:
         Deploy config to AWS S3.
         """
         if tags is None:
-            tags = dict(
-                ProjectName=self.project_name,
-                EnvName=self.env_name,
-            )
+            tags = {}
+
+        tags.update(
+            {
+                "config_pattern:project_name": self.project_name,
+                "config_pattern:env_name": self.env_name,
+            }
+        )
 
         with logger.disabled(
             disable=not verbose,
@@ -679,6 +690,7 @@ class BaseConfig:
         :param bsm:
         :param use_parameter_store:
         :param s3folder_config:
+        :param include_history:
         :param verbose:
 
         :return: a list of :class:`ConfigDeployment`.

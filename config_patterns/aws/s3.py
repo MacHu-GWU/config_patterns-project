@@ -16,6 +16,7 @@ import typing as T
 import json
 import dataclasses
 
+from botocore.exceptions import ClientError
 from boto_session_manager import BotoSesManager
 from func_args import NOTHING
 from s3pathlib import S3Path
@@ -211,7 +212,15 @@ class S3Parameter:
         For versioning disabled bucket, the version is 1, 2, 3, ...
         For versioning enabled bucket, the version is the version id of the S3 object.
         """
-        config_data = json_loads(self.s3path_latest.read_text(bsm=bsm))
+        try:
+            config_data = json_loads(self.s3path_latest.read_text(bsm=bsm))
+        except ClientError as e:
+            if "NoSuchKey" in str(e):
+                raise exc.S3ObjectNotExist(
+                    f"S3 object {self.s3path_latest.uri} not exist."
+                )
+            else: # pragma: no cover
+                raise e
         if self.version_enabled:
             config_version = self.s3path_latest.version_id
         else:

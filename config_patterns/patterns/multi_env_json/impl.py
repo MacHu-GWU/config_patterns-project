@@ -29,6 +29,7 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
+from ... import exc
 from ...logger import logger
 from ...jsonutils import json_loads
 from ...compat import cached_property
@@ -518,6 +519,8 @@ class BaseConfig:
                 name=parameter_name,
                 with_decryption=parameter_with_encryption,
             )
+            if parameter is None:
+                raise exc.ParameterNotExists(f"SSM Parameter {parameter_name!r} not exist!")
             parameter_data = parameter.json_dict
             return cls(
                 data=parameter_data["data"],

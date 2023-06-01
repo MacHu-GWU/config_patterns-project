@@ -10,6 +10,7 @@ import moto
 from boto_session_manager import BotoSesManager
 from s3pathlib import S3Path, context
 
+from config_patterns import exc
 from config_patterns.compat import cached_property
 from config_patterns.aws.s3 import KEY_CONFIG_VERSION
 from config_patterns.patterns.multi_env_json.impl import (
@@ -276,6 +277,8 @@ class TestDeployment(BaseMockTest):
         config_v1 = ConfigTestCase(version="v1").config
         config_v1.delete(bsm=self.bsm, use_parameter_store=True)
         config_v1.deploy(bsm=self.bsm, parameter_with_encryption=True)
+
+        logger.ruler("Read config from parameter store", char="*")
         config = Config.read(
             env_class=Env,
             env_enum_class=EnvEnum,
@@ -289,7 +292,26 @@ class TestDeployment(BaseMockTest):
         logger.ruler("Second Deployment, should do nothing", char="*")
         config.deploy(bsm=self.bsm, parameter_with_encryption=True)
 
-        config.delete(bsm=self.bsm, use_parameter_store=True)
+        logger.ruler("Third Deployment, should create a new version", char="*")
+        config_v2 = ConfigTestCase(version="v2").config
+        config_v2.deploy(bsm=self.bsm, parameter_with_encryption=True)
+
+        logger.ruler("Version one Deployment, should create a new version", char="*")
+        config_v2 = ConfigTestCase(version="v2").config
+        config_v2.deploy(bsm=self.bsm, parameter_with_encryption=True)
+
+        logger.ruler("Delete Parameter", char="*")
+        config.delete(bsm=self.bsm, use_parameter_store=True, include_history=False)
+
+        logger.ruler("Read config from parameter store, should fail", char="*")
+        with pytest.raises(exc.ParameterNotExists):
+            Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name=config_v2.parameter_name,
+                parameter_with_encryption=True,
+            )
 
     def _test_s3_backend_version_not_enabled(self):
         s3folder_config = "s3://my-bucket/my-project/"
@@ -403,6 +425,16 @@ class TestDeployment(BaseMockTest):
         )
         # all *.json should be deleted
         assert len(s3dir_config.iter_objects().all()) == 0
+
+        logger.ruler("Read config object from S3 Deployment, this should fail", char="*")
+        with pytest.raises(exc.S3ObjectNotExist):
+            _ = Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project-prod",
+                s3folder_config=s3folder_config,
+            )
 
         with pytest.raises(ValueError):
             # missing arguments
@@ -530,6 +562,16 @@ class TestDeployment(BaseMockTest):
         # all *.json and historical version should be deleted
         assert len(s3dir_config.iter_objects().all()) == 0
         assert len(S3Path("s3://my-versioned-bucket/my-project/my_project.json").list_object_versions().all()) == 0
+
+        logger.ruler("Read config object from S3 Deployment, this should fail", char="*")
+        with pytest.raises(exc.S3ObjectNotExist):
+            _ = Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project-prod",
+                s3folder_config=s3folder_config,
+            )
 
     def test(self):
         print("")

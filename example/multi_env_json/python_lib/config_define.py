@@ -14,7 +14,6 @@ from config_patterns.patterns.multi_env_json.api import (
 
 class EnvEnum(BaseEnvEnum):
     dev = "dev"  # development
-    int = "int"  # integration test
     prod = "prod"  # production
 
 
@@ -25,7 +24,8 @@ class Env(BaseEnv):
 
     @property
     def parameter_name(self) -> str:
-        return f"/app/{normalize_parameter_name(self.prefix_name_snake)}"
+        return f"{normalize_parameter_name(self.prefix_name_snake)}"
+        # return f"/app/{normalize_parameter_name(self.prefix_name_snake)}"
 
     @classmethod
     def from_dict(cls, data: dict):
@@ -39,10 +39,6 @@ class Config(BaseConfig):
         return self.get_env(EnvEnum.dev)
 
     @property
-    def int(self) -> Env:
-        return self.get_env(EnvEnum.int)
-
-    @property
     def prod(self) -> Env:
         return self.get_env(EnvEnum.prod)
 
@@ -52,4 +48,5 @@ class Config(BaseConfig):
 
     @property
     def parameter_name(self) -> str:
-        return f"/app/{normalize_parameter_name(self.project_name_snake)}"
+        return f"{normalize_parameter_name(self.project_name_snake)}"
+        # return f"/app/{normalize_parameter_name(self.project_name_snake)}"

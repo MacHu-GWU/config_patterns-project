@@ -534,8 +534,8 @@ class TestDeployment(BaseMockTest):
     def test(self):
         print("")
         with logger.disabled(
-            # disable=True,
-            disable=False,
+            disable=True,
+            # disable=False,
         ):
             self._test_ssm_backend()
             self._test_s3_backend_version_not_enabled()

@@ -78,7 +78,7 @@ def get_bucket_version_status(
 def _ensure_bucket_versioning_is_not_suspended(
     bucket: str,
     status: S3BucketVersionStatus,
-):
+):  # pragma: no cover
     """
     We don't store config files in a bucket with 'suspended' status. We could
     use this function to ensure the bucket versioning is not suspended.
@@ -232,7 +232,7 @@ class S3Parameter:
             for s3path in self.s3path_latest.parent.iter_objects(bsm=bsm):
                 try:
                     versions.append(int(s3path.fname.split("-")[-1]))
-                except:
+                except:  # pragma: no cover
                     pass
             if len(versions):
                 return max(versions)
@@ -242,7 +242,7 @@ class S3Parameter:
     def get_latest_config_version_when_version_is_enabled(
         self,
         bsm: BotoSesManager,
-    ) -> T.Optional[str]:
+    ) -> T.Optional[str]:  # pragma: no cover
         """
         Todo: add docstring
         """

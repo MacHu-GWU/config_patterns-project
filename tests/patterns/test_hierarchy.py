@@ -4,7 +4,7 @@ import copy
 
 import pytest
 
-from config_patterns.patterns.hierarchy import (
+from config_patterns.patterns.hierarchy.api import (
     inherit_shared_value,
     apply_shared_value,
 )

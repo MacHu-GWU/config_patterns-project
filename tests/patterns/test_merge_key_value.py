@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pytest
-from config_patterns.patterns.merge_key_value import merge_key_value
+from config_patterns.patterns.merge_key_value.api import merge_key_value
 
 
 def test_merge_key_value():

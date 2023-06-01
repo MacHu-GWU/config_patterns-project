@@ -12,5 +12,5 @@ try:
         deploy_config,
         delete_config,
     )
-except ImportError as e:
+except ImportError as e: # pragma: no cover
     pass

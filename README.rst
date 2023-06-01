@@ -18,6 +18,9 @@
 .. image:: https://img.shields.io/pypi/pyversions/config_patterns.svg
     :target: https://pypi.python.org/pypi/config_patterns
 
+.. image:: https://img.shields.io/pypi/dm/config_patterns.svg
+    :target: https://pypi.python.org/pypi/config_patterns
+
 .. image:: https://img.shields.io/badge/STAR_Me_on_GitHub!--None.svg?style=social
     :target: https://github.com/MacHu-GWU/config_patterns-project
 
@@ -50,12 +53,13 @@
 
 Welcome to ``config_patterns`` Documentation
 ==============================================================================
-``config_patterns`` is a Python library that simplify your config management for production-ready application.
+``config_patterns`` is a Python library that brings config management best practices for production-ready application.
 
-1. `Hierarchy Json Pattern for Config Management <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/separate_and_merge_non_sesitive_and_sensitive_data_example.ipynb>`_
-2. `Separate and Merge Non-Sensitive Data and Secret Data <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/hierarchy_json_example.ipynb>`_
-3. `Multi Environment Json <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/multi_env_json/example.ipynb>`_: allows you to manage configs for multi-environment deployment application, use AWS Parameter Store or AWS S3 as the backend.
-
+1. `Hierarchy Json Pattern for Config Management <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/separate_and_merge_non_sesitive_and_sensitive_data_example.ipynb>`_: allows you to define a hierarchy structure of your config data model, and inherit global config values if a specific config value is not defined.
+2. `Separate and Merge Non-Sensitive Data and Secret Data <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/hierarchy_json_example.ipynb>`_: allows you to manage non-sensitive config data and sensitive config data separately and merge them together.
+3. `Multi Environment Json <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/multi_env_json/example.ipynb>`_: allows you to manage configs for multi-environment deployment application.
+4. `Multi Environment Config Management - SSM Backend <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/multi_env_json/multi_environment_config_with_ssm_backend.ipynb>`_: a production ready solution using AWS Parameter Store as the backend for multi-environment config management.
+5. `Multi Environment Config Management - S3 Backend <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/multi_env_json/multi_environment_config_with_s3_backend.ipynb>`_: a production ready solution using AWS S3 as the backend for multi-environment config management.
 
 .. _install:
 

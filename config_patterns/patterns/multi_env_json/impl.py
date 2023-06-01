@@ -35,8 +35,8 @@ from ...compat import cached_property
 from ...utils import sha256_of_config_data
 from ...vendor.strutils import slugify
 from ...vendor.better_enum import BetterStrEnum
-from ..hierarchy import apply_shared_value
-from ..merge_key_value import merge_key_value
+from ..hierarchy.api import apply_shared_value
+from ..merge_key_value.api import merge_key_value
 
 
 def validate_project_name(project_name: str):

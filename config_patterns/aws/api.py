@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-try:
+try: # pragma: no cover
     from .s3 import (
         ZFILL,
         KEY_CONFIG_VERSION,

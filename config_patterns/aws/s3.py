@@ -230,7 +230,7 @@ class S3Parameter:
             return int(self.s3path_latest.metadata[KEY_CONFIG_VERSION])
         else:
             versions: T.List[int] = list()
-            for s3path in self.s3path_latest.parent.iter_objects():
+            for s3path in self.s3path_latest.parent.iter_objects(bsm=bsm):
                 try:
                     versions.append(int(s3path.fname.split("-")[-1]))
                 except:
@@ -451,10 +451,10 @@ def delete_config(
     if s3parameter.version_enabled is False:
         if include_history:
             _show_delete_info(s3path_latest.parent)
-            s3path_latest.parent.delete()
+            s3path_latest.parent.delete(bsm=bsm)
         else:
             _show_delete_info(s3path_latest)
-            s3path_latest.delete()
+            s3path_latest.delete(bsm=bsm)
     else:
         _show_delete_info(s3path_latest)
         s3path_latest.delete(is_hard_delete=include_history)

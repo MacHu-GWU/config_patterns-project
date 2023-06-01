@@ -5,12 +5,9 @@
         "*.project_name": "my_project"
     },
     "dev": {
-        "username": "dev.user.v2"
-    },
-    "int": {
-        "username": "int.user.v2"
+        "username": "dev.user.v3"
     },
     "prod": {
-        "username": "prod.user.v2"
+        "username": "prod.user.v3"
     }
 }

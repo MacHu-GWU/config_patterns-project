@@ -7,9 +7,6 @@
     "dev": {
         "username": "dev.user.v1"
     },
-    "int": {
-        "username": "int.user.v1"
-    },
     "prod": {
         "username": "prod.user.v1"
     }

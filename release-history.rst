@@ -4,13 +4,34 @@ Release and Version History
 ==============================================================================
 
 
-Backlog (TODO)
+1.1.1 (TODO)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**
+
+- prepare for the first API stable release.
 
 **Minor Improvements**
 
 **Bugfixes**
+
+**Miscellaneous**
+
+
+1.0.2 (2023-06-01)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Features and Improvements**
+
+- add support to use version enabled S3 bucket as the backend.
+- now keep all historical versions of the config files in version not enabled S3 bucket.
+- add code_sha256 to the S3 object metadata for integrity check.
+- add ``api`` module to expose stable APIs to public.
+
+**Minor Improvements**
+
+- rewrite the documents. Now the documents are more clear and easy to understand.
+
+**Bugfixes**
+
 
 **Miscellaneous**
 

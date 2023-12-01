@@ -258,6 +258,7 @@ class TestDeployment(BaseMockTest):
     mock_list = [
         moto.mock_ssm,
         moto.mock_s3,
+        moto.mock_sts,
     ]
     bsm: BotoSesManager = None
 

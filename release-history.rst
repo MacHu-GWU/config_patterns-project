@@ -17,6 +17,13 @@ Release and Version History
 **Miscellaneous**
 
 
+1.0.3 (2023-12-01)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Miscellaneous**
+
+- Upgrade the ``aws_console_url`` from 0.x to 1.x.
+
+
 1.0.2 (2023-06-01)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**

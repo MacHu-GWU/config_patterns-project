@@ -15,7 +15,6 @@ except ImportError:  # pragma: no cover
 
 try:
     import pysecret
-    import aws_console_url
     from s3pathlib import S3Path
 
     from ...aws.ssm import deploy_parameter, delete_parameter

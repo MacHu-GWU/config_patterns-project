@@ -14,6 +14,7 @@ from config_patterns import exc
 from config_patterns.compat import cached_property
 from config_patterns.aws.s3 import KEY_CONFIG_VERSION
 from config_patterns.patterns.multi_env_json.impl import (
+    ALL,
     validate_project_name,
     validate_env_name,
     normalize_parameter_name,
@@ -272,6 +273,14 @@ class TestDeployment(BaseMockTest):
         )
         context.attach_boto_session(cls.bsm.boto_ses)
 
+    @property
+    def bsm_collection(self) -> T.Dict[str, BotoSesManager]:
+        return {
+            ALL: self.bsm,
+            EnvEnum.dev.value: self.bsm,
+            EnvEnum.prod.value: self.bsm,
+        }
+
     def _test_ssm_backend(self):
         # --- Parameter Store
         logger.ruler("First Deployment", char="*")
@@ -291,11 +300,11 @@ class TestDeployment(BaseMockTest):
         assert config.secret_data == config_v1.secret_data
 
         logger.ruler("Second Deployment, should do nothing", char="*")
-        config.deploy(bsm=self.bsm, parameter_with_encryption=True)
+        config.deploy(bsm=self.bsm_collection, parameter_with_encryption=True)
 
         logger.ruler("Third Deployment, should create a new version", char="*")
         config_v2 = ConfigTestCase(version="v2").config
-        config_v2.deploy(bsm=self.bsm, parameter_with_encryption=True)
+        config_v2.deploy(bsm=self.bsm_collection, parameter_with_encryption=True)
 
         logger.ruler("Version one Deployment, should create a new version", char="*")
         config_v2 = ConfigTestCase(version="v2").config

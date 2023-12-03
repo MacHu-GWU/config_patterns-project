@@ -4,7 +4,7 @@ Release and Version History
 ==============================================================================
 
 
-1.1.1 (TODO)
+Backlog (TODO)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Features and Improvements**
 
@@ -15,6 +15,17 @@ Release and Version History
 **Bugfixes**
 
 **Miscellaneous**
+
+
+1.0.4 (TODO)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Minor Improvements**
+
+- The argument ``bsm`` in ``config_pattern.api.multi_env_json.Config.deploy`` and ``config_pattern.api.multi_env_json.Config.delete`` method now can be a mapper of ``bsm``, so that you can use different AWS boto session for different environments.
+
+**Miscellaneous**
+
+- Fix "Separate and Merge Non-Sensitive Data and Secret Data" document link.
 
 
 1.0.3 (2023-12-01)

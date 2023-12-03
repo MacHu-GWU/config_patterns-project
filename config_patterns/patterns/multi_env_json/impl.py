@@ -39,6 +39,9 @@ from ..hierarchy.api import apply_shared_value
 from ..merge_key_value.api import merge_key_value
 
 
+ALL = "all"
+
+
 def validate_project_name(project_name: str):
     if project_name[0] not in string.ascii_lowercase:
         raise ValueError("first letter of project_name has to be a-z!")
@@ -232,7 +235,9 @@ class ConfigDeployment:
             {
                 "config_pattern:project_name": self.project_name,
                 "config_pattern:env_name": self.env_name,
-                "config_pattern:config_sha256": sha256_of_config_data(self.parameter_data)
+                "config_pattern:config_sha256": sha256_of_config_data(
+                    self.parameter_data
+                ),
             }
         )
 
@@ -519,7 +524,9 @@ class BaseConfig:
                 with_decryption=parameter_with_encryption,
             )
             if parameter is None:
-                raise exc.ParameterNotExists(f"SSM Parameter {parameter_name!r} not exist!")
+                raise exc.ParameterNotExists(
+                    f"SSM Parameter {parameter_name!r} not exist!"
+                )
             parameter_data = parameter.json_dict
             return cls(
                 data=parameter_data["data"],
@@ -572,7 +579,7 @@ class BaseConfig:
                 parameter_name=parameter_name,
                 parameter_data=parameter_data,
                 project_name=self.project_name,
-                env_name="all",
+                env_name=ALL,
             )
         )
 
@@ -611,9 +618,32 @@ class BaseConfig:
 
         return deployment_list
 
+    def _get_specific_bsm(
+        self,
+        bsm: T.Union[
+            "boto_session_manager.BotoSesManager",
+            T.Dict[str, "boto_session_manager.BotoSesManager"],
+        ],
+        deployment: ConfigDeployment,
+    ) -> "boto_session_manager.BotoSesManager":
+        """
+        Get the specific boto session manager for the deployment.
+
+        :param bsm: the boto session manager.
+        :param deployment: the deployment object.
+        :return: the specific boto session manager.
+        """
+        if isinstance(bsm, dict):
+            return bsm[deployment.env_name]
+        else:
+            return bsm
+
     def deploy(
         self,
-        bsm: "boto_session_manager.BotoSesManager",
+        bsm: T.Union[
+            "boto_session_manager.BotoSesManager",
+            T.Dict[str, "boto_session_manager.BotoSesManager"],
+        ],
         parameter_with_encryption: T.Optional[bool] = None,
         s3folder_config: T.Optional[str] = None,
         tags: T.Optional[T.Dict[str, str]] = None,
@@ -647,8 +677,9 @@ class BaseConfig:
                 raise ValueError("parameter_with_encryption has to be True or False!")
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
+                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
                 deployment.deploy_to_ssm_parameter(
-                    bsm=bsm,
+                    bsm=specific_bsm,
                     parameter_with_encryption=parameter_with_encryption,
                     tags=tags,
                     verbose=verbose,
@@ -657,8 +688,9 @@ class BaseConfig:
         elif s3folder_config is not None:
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
+                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
                 deployment.deploy_to_s3(
-                    bsm=bsm,
+                    bsm=specific_bsm,
                     s3folder_config=s3folder_config,
                     tags=tags,
                     verbose=verbose,
@@ -675,7 +707,10 @@ class BaseConfig:
 
     def delete(
         self,
-        bsm: "boto_session_manager.BotoSesManager",
+        bsm: T.Union[
+            "boto_session_manager.BotoSesManager",
+            T.Dict[str, "boto_session_manager.BotoSesManager"],
+        ],
         use_parameter_store: T.Optional[bool] = None,
         s3folder_config: T.Optional[str] = None,
         include_history: bool = False,
@@ -704,16 +739,18 @@ class BaseConfig:
         if (bsm is not None) and (use_parameter_store is True):
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
+                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
                 deployment.delete_from_ssm_parameter(
-                    bsm=bsm,
+                    bsm=specific_bsm,
                     verbose=verbose,
                 )
             return deployment_list
         elif (bsm is not None) and (s3folder_config is not None):
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
+                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
                 deployment.delete_from_s3(
-                    bsm=bsm,
+                    bsm=specific_bsm,
                     s3folder_config=s3folder_config,
                     include_history=include_history,
                     verbose=verbose,

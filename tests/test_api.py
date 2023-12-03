@@ -12,6 +12,7 @@ def test():
     _ = api.merge_key_value.merge_key_value
 
     _ = api.multi_env_json
+    _ = api.multi_env_json.ALL
     _ = api.multi_env_json.BaseEnvEnum
     _ = api.multi_env_json.BaseEnv
     _ = api.multi_env_json.BaseConfig

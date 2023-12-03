@@ -94,7 +94,7 @@ def delete_parameter(
         if "ParameterNotFound" in str(e):
             logger.info("not exists, do nothing.")
             delete_happened = False
-        else:
+        else:  # pragma: no cover
             raise e
 
     logger.info("done!")

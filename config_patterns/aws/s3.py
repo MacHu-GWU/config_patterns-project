@@ -219,7 +219,7 @@ class S3Parameter:
                 raise exc.S3ObjectNotExist(
                     f"S3 object {self.s3path_latest.uri} not exist."
                 )
-            else: # pragma: no cover
+            else:  # pragma: no cover
                 raise e
         if self.version_enabled:
             config_version = self.s3path_latest.version_id

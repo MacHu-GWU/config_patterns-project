@@ -357,12 +357,12 @@ class TestDeployment(BaseMockTest):
         assert config.version == "1"
 
         logger.ruler("Second Deployment, should do nothing", char="*")
-        config_v1.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
+        config_v1.deploy(bsm=self.bsm_collection, s3folder_config=s3folder_config)
         assert len(s3dir_config.iter_objects().all()) == 6
 
         logger.ruler("Third Deployment, deploy v2", char="*")
         config_v2 = ConfigTestCase(version="v2").config
-        config_v2.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
+        config_v2.deploy(bsm=self.bsm_collection, s3folder_config=s3folder_config)
         s3path_list = s3dir_config.iter_objects().all()
         # *-000002.json should be created
         assert len(s3path_list) == 9
@@ -457,6 +457,151 @@ class TestDeployment(BaseMockTest):
         with pytest.raises(ValueError):
             # missing arguments
             config_v3.deploy(bsm=self.bsm)
+
+    def _test_s3_backend_version_not_enabled_use_different_s3folder(self):
+        s3folder_config = {
+            ALL: "s3://my-bucket/my-project-1/all",
+            EnvEnum.dev.value: "s3://my-bucket/my-project-1/dev",
+            EnvEnum.prod.value: "s3://my-bucket/my-project-1/prod",
+        }
+
+        def get_uri_list() -> T.List[str]:
+            uri_list = list()
+            for s3uri in s3folder_config.values():
+                uri_list.extend([
+                    s3path.uri
+                    for s3path in sorted(S3Path(s3uri).iter_objects())
+                ])
+            return uri_list
+
+        logger.ruler("First Deployment, deploy v1", char="*")
+        config_v1 = ConfigTestCase(version="v1").config
+        config_v1.delete(
+            bsm=self.bsm_collection,
+            s3folder_config=s3folder_config,
+            include_history=True,
+            verbose=False,
+        )
+        config_v1.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
+
+        uri_list = get_uri_list()
+        for uri in uri_list:
+            print(uri)
+        assert uri_list == [
+            "s3://my-bucket/my-project-1/all/my_project/my_project-000001.json",
+            "s3://my-bucket/my-project-1/all/my_project/my_project-latest.json",
+            "s3://my-bucket/my-project-1/dev/my_project-dev/my_project-dev-000001.json",
+            "s3://my-bucket/my-project-1/dev/my_project-dev/my_project-dev-latest.json",
+            "s3://my-bucket/my-project-1/prod/my_project-prod/my_project-prod-000001.json",
+            "s3://my-bucket/my-project-1/prod/my_project-prod/my_project-prod-latest.json",
+        ]
+
+        logger.ruler("Read v1 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project",
+            s3folder_config=s3folder_config[ALL],
+        )
+        assert config.version == "1"
+
+        logger.ruler("Second Deployment, should do nothing", char="*")
+        config_v1.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
+        uri_list = get_uri_list()
+        assert len(uri_list) == 6
+
+        logger.ruler("Third Deployment, deploy v2", char="*")
+        config_v2 = ConfigTestCase(version="v2").config
+        config_v2.deploy(bsm=self.bsm_collection, s3folder_config=s3folder_config)
+        uri_list = get_uri_list()
+        # *-000002.json should be created
+        assert len(uri_list) == 9
+        for uri in uri_list:
+            # the *.latest.json should have the version in the metadata
+            s3path = S3Path(uri)
+            if s3path.basename.endswith("latest.json"):
+                assert s3path.metadata[KEY_CONFIG_VERSION] == "2"
+
+        logger.ruler("Read v2 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project-dev",
+            s3folder_config=s3folder_config[EnvEnum.dev.value],
+        )
+        assert config.version == "2"
+
+        logger.ruler("Delete latest version", char="*")
+        config_v2.delete(bsm=self.bsm, s3folder_config=s3folder_config)
+        uri_list = get_uri_list()
+        # only the *.latest.json should be deleted
+        assert len(uri_list) == 6
+
+        logger.ruler("Read v2 config object from S3 Deployment, this time should fail", char="*")
+        with pytest.raises(Exception):
+            Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project-dev",
+                s3folder_config=s3folder_config[EnvEnum.dev.value],
+            )
+
+        # the *.latest.json should be deleted
+        uri_list = get_uri_list()
+        uri_latest_json_list = [
+            uri
+            for uri in uri_list if S3Path(uri).basename.endswith("latest.json")
+        ]
+        assert len(uri_latest_json_list) == 0
+
+        logger.ruler("Fourth Deployment, should deploy v3", char="*")
+        config_v3 = ConfigTestCase(version="v3").config
+        config_v3.deploy(bsm=self.bsm, s3folder_config=s3folder_config)
+        uri_list = get_uri_list()
+        # *-latest.json and *-000003.json should be created
+        assert len(uri_list) == 12
+        for uri in uri_list:
+            # the *.latest.json should have the version in the metadata
+            s3path = S3Path(uri)
+            if s3path.basename.endswith("latest.json"):
+                assert s3path.metadata[KEY_CONFIG_VERSION] == "3"
+
+        logger.ruler("Read v3 config object from S3 Deployment", char="*")
+        config = Config.read(
+            env_class=Env,
+            env_enum_class=EnvEnum,
+            bsm=self.bsm,
+            parameter_name="my_project-prod",
+            s3folder_config=s3folder_config[EnvEnum.prod.value],
+        )
+        assert config.version == "3"
+
+        logger.ruler("Delete latest versions", char="*")
+        config_v3.delete(bsm=self.bsm, s3folder_config=s3folder_config)
+        # only the *.latest.json should be deleted
+        uri_list = get_uri_list()
+        assert len(uri_list) == 9
+
+        logger.ruler("Delete historical versions", char="*")
+        config_v3.delete(
+            bsm=self.bsm, s3folder_config=s3folder_config, include_history=True
+        )
+        # all *.json should be deleted
+        uri_list = get_uri_list()
+        assert len(uri_list) == 0
+
+        logger.ruler("Read config object from S3 Deployment, this should fail", char="*")
+        with pytest.raises(exc.S3ObjectNotExist):
+            _ = Config.read(
+                env_class=Env,
+                env_enum_class=EnvEnum,
+                bsm=self.bsm,
+                parameter_name="my_project-prod",
+                s3folder_config=s3folder_config[EnvEnum.prod.value],
+            )
 
     def _test_s3_backend_version_enabled(self):
         s3folder_config = "s3://my-versioned-bucket/my-project/"
@@ -591,6 +736,7 @@ class TestDeployment(BaseMockTest):
         ):
             self._test_ssm_backend()
             self._test_s3_backend_version_not_enabled()
+            self._test_s3_backend_version_not_enabled_use_different_s3folder()
             self._test_s3_backend_version_enabled()
 
 if __name__ == "__main__":

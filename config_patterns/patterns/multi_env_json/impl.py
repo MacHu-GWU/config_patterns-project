@@ -503,6 +503,7 @@ class BaseConfig:
         :param parameter_name: the AWS Parameter name.
         :param parameter_with_encryption: is AWS Parameter turned on encryption?
         :param s3folder_config: the s3 folder uri where you store the config file.
+
         :return:
         """
         if (path_config is not None) and (path_secret_config is not None):
@@ -638,6 +639,24 @@ class BaseConfig:
         else:
             return bsm
 
+    def _get_specific_s3folder_config(
+        self,
+        s3folder_config: T.Union[str, T.Dict[str, str]],
+        deployment: ConfigDeployment,
+    ) -> str:
+        """
+        Get the specific boto session manager for the deployment.
+
+        :param s3folder_config: s3 folder to store versioned config data.
+        :param deployment: the deployment object.
+        :return: the specific s3 folder to store versioned config data.
+        """
+        if isinstance(s3folder_config, dict):
+            return s3folder_config[deployment.env_name]
+        else:
+            return s3folder_config
+
+    # fmt: off
     def deploy(
         self,
         bsm: T.Union[
@@ -645,10 +664,16 @@ class BaseConfig:
             T.Dict[str, "boto_session_manager.BotoSesManager"],
         ],
         parameter_with_encryption: T.Optional[bool] = None,
-        s3folder_config: T.Optional[str] = None,
+        s3folder_config: T.Optional[
+            T.Union[
+                str,
+                T.Dict[str, str],
+            ]
+        ] = None,
         tags: T.Optional[T.Dict[str, str]] = None,
         verbose: bool = True,
     ) -> T.List[ConfigDeployment]:
+    # fmt: on
         """
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
@@ -660,11 +685,44 @@ class BaseConfig:
 
             this function should ONLY run from the project admin's trusted laptop.
 
-        :param bsm:
-        :param parameter_with_encryption:
-        :param s3folder_config:
-        :param tags:
-        :param verbose:
+        Detailed Description of the Deployment Behavior
+
+        Assume you have a project named "my-project" with two environments:
+        dev and prod.
+
+        **Deploy to AWS Parameter store**
+
+        - Create three parameters named "my_project", "my_project-dev", and "my_project-prod".
+            The "my_project" parameter contains information for all environments,
+             while "my_project-dev" contains only development environment information,
+             and "my_project-prod" contains only production environment information.
+        - If the content of a parameter remains unchanged comparing to the latest version,
+            a new version will not be created.
+
+        **Deploy to AWS S3**
+
+        If the value of  ``s3folder_config`` is "s3://my-bucket/my-project/",
+        then it will create the following s3 objects:
+
+        - "s3://my-bucket/my-project/my_project/my_project-latest.json"
+        - "s3://my-bucket/my-project/my_project/my_project-000001.json"
+        - "s3://my-bucket/my-project/my_project-dev/my_project-dev-latest.json"
+        - "s3://my-bucket/my-project/my_project-dev/my_project-dev-000001.json"
+        - "s3://my-bucket/my-project/my_project-prod/my_project-prod-latest.json"
+        - "s3://my-bucket/my-project/my_project-prod/my_project-prod-000001.json"
+
+        The naming convention is: "${s3folder_config}/${parameter_name}/${parameter_name}-${version}.json"
+
+        :param bsm: one boto session manager or a dict of mapping from
+            environment name to it's boto session manager (it has to have the "all")
+        :param parameter_with_encryption: if set this value to either True or False,
+            it will deploy the config to AWS parameter store.
+        :param s3folder_config: one s3 folder uri or a dict of mapping from
+            environment name to it's s3 folder uri (it has to have the "all").
+            if this value is specified, it will deploy the config to AWS S3.
+        :param tags: optional AWS resource tags to add to the parameter store
+            or S3 object.
+        :param verbose: whether to print out the log.
 
         :return: a list of :class:`ConfigDeployment`.
         """
@@ -688,10 +746,17 @@ class BaseConfig:
         elif s3folder_config is not None:
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
-                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
+                specific_bsm = self._get_specific_bsm(
+                    bsm=bsm,
+                    deployment=deployment,
+                )
+                specific_s3folder_config = self._get_specific_s3folder_config(
+                    s3folder_config=s3folder_config,
+                    deployment=deployment,
+                )
                 deployment.deploy_to_s3(
                     bsm=specific_bsm,
-                    s3folder_config=s3folder_config,
+                    s3folder_config=specific_s3folder_config,
                     tags=tags,
                     verbose=verbose,
                 )
@@ -705,6 +770,7 @@ class BaseConfig:
                 "to indicate that you want to deploy to S3."
             )
 
+    # fmt: off
     def delete(
         self,
         bsm: T.Union[
@@ -712,10 +778,16 @@ class BaseConfig:
             T.Dict[str, "boto_session_manager.BotoSesManager"],
         ],
         use_parameter_store: T.Optional[bool] = None,
-        s3folder_config: T.Optional[str] = None,
+        s3folder_config: T.Optional[
+            T.Union[
+                str,
+                T.Dict[str, str],
+            ]
+        ] = None,
         include_history: bool = False,
         verbose: bool = True,
     ):
+    # fmt: on
         """
         Delete the all project config of all environments from configuration store.
 
@@ -724,17 +796,20 @@ class BaseConfig:
         1. delete from AWS Parameter Store
         2. delete from AWS S3
 
-        :param bsm:
-        :param use_parameter_store:
-        :param s3folder_config:
-        :param include_history:
-        :param verbose:
-
-        :return: a list of :class:`ConfigDeployment`.
-
         Note:
 
             this function should ONLY run from the project admin's trusted laptop.
+
+        :param bsm: one boto session manager or a dict of mapping from
+            environment name to it's boto session manager (it has to have the "all")
+        :param use_parameter_store: if set this value to True, it will delete the config
+            from AWS parameter store.
+        :param s3folder_config: one s3 folder uri or a dict of mapping from
+            environment name to it's s3 folder uri (it has to have the "all").
+            if this value is specified, it will delete the config from AWS S3.
+        :param include_history: if False, only delete the latest version,
+            if True, delete all historical versions.
+        :param verbose: whether to print out the log.
         """
         if (bsm is not None) and (use_parameter_store is True):
             deployment_list = self.prepare_deploy()
@@ -748,10 +823,17 @@ class BaseConfig:
         elif (bsm is not None) and (s3folder_config is not None):
             deployment_list = self.prepare_deploy()
             for deployment in deployment_list:
-                specific_bsm = self._get_specific_bsm(bsm=bsm, deployment=deployment)
+                specific_bsm = self._get_specific_bsm(
+                    bsm=bsm,
+                    deployment=deployment,
+                )
+                specific_s3folder_config = self._get_specific_s3folder_config(
+                    s3folder_config=s3folder_config,
+                    deployment=deployment,
+                )
                 deployment.delete_from_s3(
                     bsm=specific_bsm,
-                    s3folder_config=s3folder_config,
+                    s3folder_config=specific_s3folder_config,
                     include_history=include_history,
                     verbose=verbose,
                 )

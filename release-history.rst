@@ -17,6 +17,13 @@ Backlog (TODO)
 **Miscellaneous**
 
 
+1.0.5 (2023-12-12)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Minor Improvements**
+
+- The argument ``s3folder_config`` in ``config_pattern.api.multi_env_json.Config.deploy`` and ``config_pattern.api.multi_env_json.Config.delete`` method now can be a mapper of ``s3folder_config``, so that you can use different S3 bucket folder for different environments.
+
+
 1.0.4 (2023-12-04)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Minor Improvements**

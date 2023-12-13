@@ -678,8 +678,8 @@ class BaseConfig:
         Deploy the project config of all environments to configuration store.
         Currently, it supports:
 
-        1. deploy to AWS Parameter Store
-        2. deploy to AWS S3
+        1. deploy to AWS Parameter Store.
+        2. deploy to AWS S3.
 
         Note:
 

@@ -56,6 +56,8 @@
 
 Welcome to ``config_patterns`` Documentation
 ==============================================================================
+.. image:: https://github.com/MacHu-GWU/config_patterns-project/assets/6800411/0cfdeee0-6740-4522-b2e9-a17e51facba9
+
 ``config_patterns`` is a Python library that brings config management best practices for production-ready application.
 
 1. `Hierarchy Json Pattern for Config Management <https://github.com/MacHu-GWU/config_patterns-project/blob/main/example/separate_and_merge_non_sesitive_and_sensitive_data_example.ipynb>`_: allows you to define a hierarchy structure of your config data model, and inherit global config values if a specific config value is not defined.

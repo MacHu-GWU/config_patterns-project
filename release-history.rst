@@ -17,6 +17,13 @@ Backlog (TODO)
 **Miscellaneous**
 
 
+1.0.6 (2023-12-13)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Minor Improvements**
+
+- Add type hint using generic type for ``config_pattern.api.multi_env_json.BaseConfig`` and ``config_pattern.api.multi_env_json.BaseEnv``.
+
+
 1.0.5 (2023-12-12)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Minor Improvements**

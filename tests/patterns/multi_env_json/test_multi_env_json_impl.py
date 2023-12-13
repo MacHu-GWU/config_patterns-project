@@ -77,7 +77,7 @@ class Env(BaseEnv):
 
 
 @dataclasses.dataclass
-class Config(BaseConfig):
+class Config(BaseConfig[Env]):
     @classmethod
     def get_current_env(cls) -> str:
         return EnvEnum.dev.value

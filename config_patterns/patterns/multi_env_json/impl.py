@@ -89,6 +89,18 @@ class BaseEnv:
     """
     Per environment config data.
 
+    You should subclass this and define your own per-environment config data schema.
+
+    Example::
+
+        import typing as T
+        import dataclasses
+
+        @dataclasses.dataclass
+        class Env(BaseEnv):
+            username: T.Optional[str] = dataclasses.field(default=None)
+            password: T.Optional[str] = dataclasses.field(default=None)
+
     :param project_name: a project name is a string that is full lowercase,
         can include letters and digits, start with letter, _ or - delimiter only
         cannot start or end with delimiter.
@@ -176,6 +188,9 @@ class BaseEnv:
         Example: "my_project-dev"
         """
         return normalize_parameter_name(self.prefix_name_snake)
+
+
+T_BASE_ENV = T.TypeVar("T_BASE_ENV", bound=BaseEnv)
 
 
 @dataclasses.dataclass
@@ -325,9 +340,35 @@ class ConfigDeployment:
 
 
 @dataclasses.dataclass
-class BaseConfig:
+class BaseConfig(T.Generic[T_BASE_ENV]):
     """
     The base class for multi-environment config object.
+
+    You should subclass this and define as-many methods as you with.
+
+    Example::
+
+        import typing as T
+        import dataclasses
+
+        @dataclasses.dataclass
+        class Env(BaseEnv):
+            username: T.Optional[str] = dataclasses.field(default=None)
+            password: T.Optional[str] = dataclasses.field(default=None)
+
+        @dataclasses.dataclass
+        class Config(BaseConfig[Env]):
+            @property
+            def dev_env(self) -> Env:
+                return self.get_env("dev")
+
+            @property
+            def int_env(self) -> Env:
+                return self.get_env("int")
+
+            @property
+            def prod_env(self) -> Env:
+                return self.get_env("prod")
 
     :param data: Nonsensitive config data.
     :param secret_data: Sensitive config data.
@@ -359,7 +400,7 @@ class BaseConfig:
     data: dict = dataclasses.field()
     secret_data: dict = dataclasses.field()
 
-    Env: T.Type[BaseEnv] = dataclasses.field()
+    Env: T.Type[T_BASE_ENV] = dataclasses.field()
     EnvEnum: T.Type[BaseEnvEnum] = dataclasses.field()
 
     version: str = dataclasses.field()
@@ -422,7 +463,7 @@ class BaseConfig:
 
     # don't put type hint for return value, it should return a
     # user defined subclass, which is impossible to predict.
-    def get_env(self, env_name: T.Union[str, BaseEnvEnum]):
+    def get_env(self, env_name: T.Union[str, BaseEnvEnum]) -> T_BASE_ENV:
         env_name = self.EnvEnum.ensure_str(env_name)
         data = copy.deepcopy(self._merged[env_name])
         data["env_name"] = env_name
@@ -470,7 +511,7 @@ class BaseConfig:
     # don't put type hint for return value, it should return a
     # user defined subclass, which is impossible to predict.
     @cached_property
-    def env(self):  # pragma: no cover
+    def env(self) -> T_BASE_ENV:  # pragma: no cover
         """
         Access the current :class:`Env` object.
         """

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from .vendor.nest_logger import NestedLogger
+from vislog import VisLog
 from .paths import PACKAGE_NAME
 
-logger = NestedLogger(
+logger = VisLog(
     name=PACKAGE_NAME,
     log_format="%(message)s",
 )

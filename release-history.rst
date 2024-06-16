@@ -17,6 +17,21 @@ Backlog (TODO)
 **Miscellaneous**
 
 
+1.0.7 (2024-06-16)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Minor Improvements**
+
+- Add support for Python3.11 and 3.12.
+
+**Bugfixes**
+
+- Fix a logging issue that won't work in Python3.11 and 3.12.
+
+**Miscellaneous**
+
+- Migrate to ``cookiecutter-pyproject@v4`` code skeleton.
+
+
 1.0.6 (2023-12-13)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Minor Improvements**

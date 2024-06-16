@@ -39,6 +39,7 @@ import contextlib
 from functools import wraps
 from datetime import datetime
 
+__version__ = "0.2.1"
 
 def create_logger(
     name: T.Optional[str] = None,
@@ -64,7 +65,7 @@ def create_logger(
     return logger
 
 
-tab = " " * 2
+DEFAULT_TAB = " " * 2
 
 
 def encode_pipe(pipe: str) -> str:
@@ -73,7 +74,7 @@ def encode_pipe(pipe: str) -> str:
     elif len(pipe) == 2 and pipe[1] == " ":
         return pipe
     else:  # pragma: no cover
-        raise ValueError
+        raise ValueError("the pipe symbol must be one character.")
 
 
 DEFAULT_PIPE = encode_pipe("| ")
@@ -82,6 +83,7 @@ DEFAULT_PIPE = encode_pipe("| ")
 def format_line(
     msg: str,
     indent: int = 0,
+    tab: str = DEFAULT_TAB,
     nest: int = 0,
     _pipes: T.Optional[T.List[str]] = None,
 ) -> str:
@@ -177,7 +179,7 @@ def format_ruler(
         if len(_pipes) != nest:
             raise ValueError
     nesting = "".join(_pipes)
-    s = f"{nesting}{corner}{left_pad}{msg:{char}{align}{length}}{right_pad}{corner}"
+    s = f"{nesting}{corner}{left_pad}{msg:{char}{align.value}{length}}{right_pad}{corner}"
     return s
 
 
@@ -200,6 +202,8 @@ class NestedLogger:
         level: int = logging.INFO,
         log_format: str = "[User %(asctime)s] %(message)s",
         datetime_format: str = "%Y-%m-%d %H:%m:%S",
+        tab: str = DEFAULT_TAB,
+        pipe: str = DEFAULT_PIPE,
     ):
         if logger is None:
             self._logger = create_logger(
@@ -211,12 +215,15 @@ class NestedLogger:
         else:  # pragma: no cover
             self._logger = logger
 
+        # ``_indent`` stores the current level of indentation
+        self._indent = 0
+        self._tab = tab
         # ``_nest`` stores the current level of nesting
         self._nest = 0
         # ``_pipes`` is a first in last out stack data structure that stores
         # the list of pipe character for different level of nesting
         self._pipes = [
-            DEFAULT_PIPE,
+            pipe,
         ]
 
     def _pipe_start(
@@ -232,11 +239,13 @@ class NestedLogger:
             return None
 
     def _pipe_end(
-        self, pipe: T.Optional[str] = None, last_Pipe: T.Optional[str] = None
+        self,
+        pipe: T.Optional[str] = None,
+        last_pipe: T.Optional[str] = None,
     ):
         if pipe is not None:
             self._pipes.pop()
-            self._pipes.append(last_Pipe)
+            self._pipes.append(last_pipe)
 
     @contextlib.contextmanager
     def pipe(
@@ -254,12 +263,21 @@ class NestedLogger:
         func: T.Callable,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:
+        if tab is None:
+            tab = self._tab
         with self.pipe(pipe=pipe):
             lines = msg.split("\n")
             for line in lines:
-                output = format_line(line, indent, self._nest, self._pipes)
+                output = format_line(
+                    msg=line,
+                    indent=self._indent + indent,
+                    tab=tab,
+                    nest=self._nest,
+                    _pipes=self._pipes,
+                )
                 func(output)
         return output
 
@@ -267,56 +285,91 @@ class NestedLogger:
         self,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:  # pragma: no cover
         """
         Todo: add docstring
         """
-        return self._log(self._logger.debug, msg, indent, pipe)
+        return self._log(
+            func=self._logger.debug,
+            msg=msg,
+            indent=indent,
+            tab=tab,
+            pipe=pipe,
+        )
 
     def info(
         self,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:
         """
         Todo: add docstring
         """
-        return self._log(self._logger.info, msg, indent, pipe)
+        return self._log(
+            func=self._logger.info,
+            msg=msg,
+            indent=indent,
+            tab=tab,
+            pipe=pipe,
+        )
 
     def warning(
         self,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:  # pragma: no cover
         """
         Todo: add docstring
         """
-        return self._log(self._logger.warning, msg, indent, pipe)
+        return self._log(
+            func=self._logger.warning,
+            msg=msg,
+            indent=indent,
+            tab=tab,
+            pipe=pipe,
+        )
 
     def error(
         self,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:  # pragma: no cover
         """
         Todo: add docstring
         """
-        return self._log(self._logger.error, msg, indent, pipe)
+        return self._log(
+            func=self._logger.error,
+            msg=msg,
+            indent=indent,
+            tab=tab,
+            pipe=pipe,
+        )
 
     def critical(
         self,
         msg: str,
         indent: int = 0,
+        tab: T.Optional[str] = None,
         pipe: T.Optional[str] = None,
     ) -> str:  # pragma: no cover
         """
         Todo: add docstring
         """
-        return self._log(self._logger.critical, msg, indent, pipe)
+        return self._log(
+            func=self._logger.critical,
+            msg=msg,
+            indent=indent,
+            tab=tab,
+            pipe=pipe,
+        )
 
     def ruler(
         self,
@@ -350,6 +403,53 @@ class NestedLogger:
             )
             func(output)
         return output
+
+    def _indent_start(self, level: int = 1):
+        self._indent += level
+
+    def _indent_end(self, level: int = 1):
+        self._indent -= level
+
+    @contextlib.contextmanager
+    def indent(self, level: int = 1):
+        """
+        A context manager that automatically add indent.
+
+        Example:
+
+        .. code-block:: python
+
+            logger.ruler("start test indent")
+
+            logger.info("a")
+
+            with logger.indent():
+                logger.info("b")
+
+                with logger.indent():
+                    logger.info("c")
+
+                logger.info("d")
+
+            logger.info("e")
+
+            logger.ruler("end test indent")
+
+        The output looks like::
+
+            [User] +----- start test indent -----------------------------------+
+            [User] | a
+            [User] |   b
+            [User] |     c
+            [User] |   d
+            [User] | e
+            [User] +----- end test indent -------------------------------------+
+        """
+        self._indent_start(level=level)
+        try:
+            yield self
+        finally:
+            self._indent_end(level=level)
 
     def _nested_start(
         self,
@@ -461,6 +561,8 @@ class NestedLogger:
             [User] | +----- End my_func2(), elapsed = 1.00 sec ----------------+
             [User] |
             [User] +----- End my_func1(), elapsed = 2.00 sec ------------------+
+
+        :return: a decorator that you can put on top of your function
         """
 
         @decohints
@@ -508,6 +610,11 @@ class NestedLogger:
                         right_padding=right_padding,
                         corner=corner,
                     )
+                    for _ in range(nest):
+                        self._nested_end()
+
+                    if nest == 0 and (pipe is not None):
+                        self._pipe_end(pipe, last_pipe)
                     raise e
 
                 et = datetime.utcnow()
@@ -580,7 +687,8 @@ class NestedLogger:
         :param start_emoji: custom emoji for the start message
         :param end_emoji: custom emoji for the end message
         :param pipe: custom pipe character
-        :return:
+
+        :return: a decorator that you can put on top of your function
         """
         if start_emoji and (not start_emoji.endswith(" ")):
             start_emoji = start_emoji + " "
@@ -593,6 +701,51 @@ class NestedLogger:
             error_msg=f"⏰ {error_emoji}Error {msg!r}, elapsed = {{elapsed:.2f}} sec",
             end_msg=f"⏰ {end_emoji}End {msg!r}, elapsed = {{elapsed:.2f}} sec",
             pipe=pipe,
+        )
+
+    def emoji_block(
+        self,
+        msg: str,
+        emoji: str,
+    ):
+        """
+        A simplified version of the ``start_and_end`` decorator. Use emoji
+        to Visually print the function logic block
+
+        Example:
+
+        .. code-block:: python
+
+            @logger.emoji_block(
+                msg="Deploy app {app_name}",
+                emoji="🚀",
+            )
+            def deploy_app(app_name: str):
+                logger.info("working ...")
+                logger.info("done")
+
+            deploy_app(app_name="my_app")
+
+        The output looks like::
+
+            [User] +----- ⏱ 🚀 Start 'Deploy app my_app' ----------------------+
+            [User] 🚀
+            [User] 🚀 working ...
+            [User] 🚀 done
+            [User] 🚀
+            [User] +----- ⏰ ✅ 🚀 End 'Deploy app my_app', elapsed = 1.01 sec -+
+
+        :param msg: indicate the name of the function
+        :param emoji: custom emoji for the visual effect
+
+        :return: a decorator that you can put on top of your function
+        """
+        return self.start_and_end(
+            msg=msg,
+            start_emoji=emoji,
+            error_emoji=f"❌ {emoji}",
+            end_emoji=f"✅ {emoji}",
+            pipe=emoji,
         )
 
     @contextlib.contextmanager

@@ -3,7 +3,7 @@
     :target: https://config_patterns.readthedocs.io/index.html
     :alt: Documentation Status
 
-.. image:: https://github.com/MacHu-GWU/config_patterns-project/workflows/CI/badge.svg
+.. image:: https://github.com/MacHu-GWU/config_patterns-project/actions/workflows/main.yml/badge.svg
     :target: https://github.com/MacHu-GWU/config_patterns-project/actions?query=workflow:CI
 
 .. image:: https://codecov.io/gh/MacHu-GWU/config_patterns-project/branch/main/graph/badge.svg
